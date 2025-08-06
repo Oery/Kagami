@@ -1,5 +1,0 @@
-use crate::minecraft::Packet;
-use kagami_macro::{packet, Deserialize, Serialize};
-
-#[packet(0x00, client)]
-pub struct PingStart {}
