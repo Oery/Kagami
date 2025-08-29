@@ -1,0 +1,250 @@
+use crate::context::ProxyContext;
+use crate::error::{KResult, KagamiError, PResult, PacketError};
+use crate::events::EventManager;
+use crate::packet::{Packet, packet};
+use crate::packets::{Handshake, LoginSuccess, SetCompression};
+use crate::state::State;
+use crate::varint::temp_convert;
+
+use std::io::Write;
+
+use async_std::io::WriteExt;
+use async_std::net::{TcpListener, TcpStream};
+use async_std::prelude::*;
+use async_std::task;
+use flate2::Compression;
+use flate2::write::ZlibEncoder;
+use std::net::Shutdown;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use tracing::info;
+
+const HOST: &str = "127.0.0.1:25565";
+const PROXY: &str = "127.0.0.1:25566";
+const BUFFER_SIZE: usize = 128_000; // TODO: Measure what is needed
+
+use std::fmt::Debug;
+
+pub trait Payload<'a>: Debug + Sized {
+    fn deserialize(raw_payload: &'a [u8]) -> PResult<Self>;
+    fn serialize(&self, buf: &mut [u8]) -> PResult<()>;
+    fn dispatch(self, ctx: &mut ProxyContext);
+}
+
+// TODO:
+// On doit pouvoir appeler un event qui correspond au payload
+// L'event doit pouvoir modifier le contenu du payload
+//
+// TODO:
+// La fonction doit early return si le packet n'a aucun event associé
+//
+// TODO:
+// Maybe use a RingBuffer, this would remove the need for a acc buffer
+
+async fn handle_payload<'a, T: Payload<'a>>(
+    ctx: &mut ProxyContext<'_>,
+    packet: &'a Packet<'a>,
+) -> PResult<()> {
+    // TODO: Check if events exists for T
+
+    let payload = T::deserialize(&packet.raw_payload)?;
+    dbg!(&payload);
+    payload.dispatch(ctx);
+
+    return Err(PacketError::UnknownPacket);
+
+    // match payload {
+    // if Borrowed -> send packet and original payload
+    // if Owned -> Serialize Struct and send
+    // }
+
+    // TODO: Serialize Packet
+
+    // Ok(())
+}
+
+async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Result<(), PacketError> {
+    println!("Received Packet: {packet:?}");
+    let state = ctx.state.load(Ordering::Relaxed);
+    println!("State: {state:?}, Source: {:?}", ctx.source);
+
+    use crate::context::Source::*;
+
+    match (&ctx.source, state, packet.id) {
+        (Client, State::Handshake, 0x00) => handle_payload::<Handshake>(ctx, packet).await,
+        (Server, State::Login, 0x02) => handle_payload::<LoginSuccess>(ctx, packet).await,
+        (Server, State::Login, 0x03) => handle_payload::<SetCompression>(ctx, packet).await,
+        (Server, State::Play, 0x46) => handle_payload::<SetCompression>(ctx, packet).await,
+        _ => Err(PacketError::UnknownPacket),
+    }
+}
+
+fn next_packet<'a, 'b>(
+    ctx: &'a ProxyContext<'a>,
+    input: &'b [u8],
+) -> PResult<Option<(&'b [u8], Packet<'b>)>> {
+    let cmp = ctx.compress_threshold.load(Ordering::Relaxed);
+
+    match packet(input, cmp) {
+        Ok(data) => Ok(Some(data)),
+        Err(nom::Err::Incomplete(_)) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+// TODO:
+// If packet is raw, do this
+// Else Serialize data, get_length, then do it
+//
+// TODO:
+// Support Compression
+async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::io::Result<()> {
+    let packet_id = temp_convert(packet.id)?;
+    let packet_len = packet.raw_payload.len() + packet_id.len();
+    let threshold = ctx.compress_threshold.load(Ordering::Relaxed);
+
+    println!("Writing Packet");
+
+    // FIXME:
+    // SetCompression is sent to the client after the state has changed
+    // This causes the packet to be compressed before comp was enabled for client
+    // and results in a client crash
+    // (Maybe set a flag to keep track of the state the packet arrived in)
+    let state = ctx.state.load(Ordering::Relaxed);
+    if threshold == -1 || (packet.id == 3 && state == State::Login) {
+        ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;
+        ctx.dst.writer.write(&packet_id).await?;
+        ctx.dst.writer.write(&packet.raw_payload).await?;
+        return Ok(());
+    } 
+
+    println!("PACKET_LENGTH={packet_len} | THRESHOLD={threshold}");
+    if packet_len < threshold as usize {
+        let packet_len = packet_len + 1;
+        println!("Writing Packet with ID = {} and size {packet_len}", packet.id);
+        ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;
+        ctx.dst.writer.write(&temp_convert(0)?).await?;
+        ctx.dst.writer.write(&packet_id).await?;
+        ctx.dst.writer.write(&packet.raw_payload).await?;
+        return Ok(());
+    }
+
+    println!("Writing Compressed Packet");
+
+    let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
+    e.write_all(&packet_id)?;
+    e.write_all(&packet.raw_payload)?;
+    let compressed = e.finish()?;
+
+    let data_len = temp_convert(compressed.len() as i32)?;
+    let packet_len = data_len.len() + compressed.len();
+
+    ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;
+    ctx.dst.writer.write(&data_len).await?;
+    ctx.dst.writer.write(&compressed).await?;
+    ctx.dst.writer.flush().await?;
+
+    Ok(())
+}
+
+async fn parse_buf(ctx: &mut ProxyContext<'_>, bytes: &[u8], buf_acc: &mut Vec<u8>) -> KResult<()> {
+    buf_acc.reserve(bytes.len());
+    buf_acc.extend_from_slice(bytes);
+
+    let mut bytes = buf_acc.as_slice();
+
+    while let Some((slice, packet)) = next_packet(ctx, bytes)? {
+        match handle_packet(ctx, &packet).await {
+            Err(PacketError::Deserializing(e)) => return Err(PacketError::Deserializing(e).into()),
+            Err(_) => write_packet(ctx, &packet).await?,
+            Ok(_) => {}
+        }
+
+        bytes = slice;
+    }
+
+    buf_acc.truncate(bytes.len());
+    ctx.dst.writer.flush().await?;
+    ctx.src.writer.flush().await?;
+
+    Ok(())
+}
+
+// TODO: Maybe rename this with a shorter name
+async fn handle_stream(ctx: &mut ProxyContext<'_>) -> KResult<()> {
+    let mut buf = vec![0; BUFFER_SIZE];
+    let mut buf_acc = Vec::with_capacity(BUFFER_SIZE);
+
+    loop {
+        match ctx.src.reader.read(&mut buf).await? {
+            0 => return Ok(()),
+            n => parse_buf(ctx, &buf[..n], &mut buf_acc).await?,
+        };
+    }
+}
+
+// TODO:
+// Handle this result to know why the connection ended, could be closed normally or
+// forcefully closed by an issue on our side, an io error, etc...
+//
+// async fn on_client_join<'a, 'b>(client: TcpStream, proxy: Arc<&'b Proxy<'b>>) -> KResult<()> {
+//     let server = TcpStream::connect(HOST).await?;
+//
+//     let (mut client_ctx, mut server_ctx) = Context::new(proxy, &client, &server);
+//     if let Err(e) = futures::try_join!(handle_stream(&mut client_ctx), handle_stream(&mut server_ctx)) {
+//         dbg!(e);
+//     }
+//
+//     let _ = client.shutdown(std::net::Shutdown::Both);
+//     let _ = server.shutdown(std::net::Shutdown::Both);
+//
+//     info!("Connection closed");
+//
+//     Ok(())
+// }
+//
+#[derive(Default)]
+pub struct Proxy {
+    pub events: EventManager,
+}
+
+impl Proxy {
+    pub fn new() -> Proxy {
+        Proxy { ..Default::default() }
+    }
+
+    pub async fn run(self) -> KResult<()> {
+        let listener = TcpListener::bind(PROXY).await?;
+        let proxy_ref = Arc::new(self);
+
+        while let Ok((client, _)) = listener.accept().await {
+            let proxy = proxy_ref.clone();
+            task::spawn(Proxy::on_client_join(client, proxy));
+        }
+
+        Ok(())
+    }
+
+    pub async fn on_client_join(client: TcpStream, proxy: Arc<Proxy>) -> KResult<()> {
+        let server = TcpStream::connect(HOST).await?;
+        let _ = server.set_nodelay(true)?;
+        let _ = client.set_nodelay(true)?;
+
+        let (mut client_ctx, mut server_ctx) = ProxyContext::new(&client, &server, proxy);
+        if let Err(e) = futures::try_join!(handle_stream(&mut client_ctx), handle_stream(&mut server_ctx)) {
+            eprintln!("Unexpected Error: {e:?}");
+        }
+        // if let Err(KagamiError::PacketError(PacketError::Deserializing(nom::Err::Failure(e)))) =
+        //     futures::try_join!(handle_stream(&mut client_ctx), handle_stream(&mut server_ctx))
+        // {
+        //     eprintln!("Unexpected Error: {:?}\n{:?}", e.code, e.input);
+        // }
+
+        let _ = client.shutdown(Shutdown::Both);
+        let _ = server.shutdown(Shutdown::Both);
+
+        info!("Connection closed");
+
+        Ok(())
+    }
+}
