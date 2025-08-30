@@ -11,9 +11,7 @@ use crate::state::State;
 
 #[derive(Debug, Default)]
 pub struct Packet<'a> {
-    pub length: i32,
     pub id: i32,
-    // pub raw_payload: &'a [u8],
     pub raw_payload: Cow<'a, [u8]>,
 }
 
@@ -77,7 +75,7 @@ pub fn packet(input: &[u8], cmp: i32) -> IResult<&[u8], Packet> {
     if cmp == -1 {
         let (raw_payload, id) = varint_i32(packet)?;
         let raw_payload: Cow<'_, [u8]> = raw_payload.into();
-        return Ok((input, Packet { length, id, raw_payload }));
+        return Ok((input, Packet { id, raw_payload }));
     }
 
     let (data, size) = varint_i32(packet)?;
@@ -87,19 +85,20 @@ pub fn packet(input: &[u8], cmp: i32) -> IResult<&[u8], Packet> {
     if size == 0 {
         let (raw_payload, id) = varint_i32(data)?;
         let raw_payload: Cow<'_, [u8]> = raw_payload.into();
-        return Ok((input, Packet { length, id, raw_payload }));
+        return Ok((input, Packet { id, raw_payload }));
     }
 
     let (_, (id, raw_payload)) = compressed_packet(data, size as usize)?;
 
-    Ok((input, Packet { length, id, raw_payload: raw_payload.into() }))
+    Ok((input, Packet { id, raw_payload: raw_payload.into() }))
 }
 
 pub fn compressed_packet(input: &[u8], size: usize) -> IResult<&[u8], (i32, Vec<u8>)> {
     println!("Decompressing Packet of size {size}, Input size: {}", input.len());
     let mut e = ZlibDecoder::new(input);
     let mut raw_payload = vec![0; size];
-    e.read_exact(raw_payload.as_mut_slice()).expect("Failed to read until end");
+    e.read_exact(raw_payload.as_mut_slice())
+        .expect("Failed to read until end");
 
     let (_, id) = varint_i32(&raw_payload).expect("Failed to read id for compressed packet");
     println!("Decompressed packet with id {id} and {raw_payload:?}");
