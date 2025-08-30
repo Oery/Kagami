@@ -42,21 +42,16 @@ pub trait Payload<'a>: Debug + Sized {
     );
 }
 
-// TODO:
-// On doit pouvoir appeler un event qui correspond au payload
-// L'event doit pouvoir modifier le contenu du payload
-//
-// TODO:
-// La fonction doit early return si le packet n'a aucun event associé
-//
-// TODO:
-// Maybe use a RingBuffer, this would remove the need for a acc buffer
+// TODO: Use a RingBuffer
+// -- This would remove the need of copying bytes in an acc buffer
 
 async fn handle_payload<'a, T: Payload<'a>>(
     ctx: &mut ProxyContext<'_>,
     packet: &'a Packet<'a>,
 ) -> PResult<()> {
-    // TODO: Check if events exists for T
+    if !T::has_events(&ctx.proxy.events) {
+        return Ok(());
+    }
 
     let payload = T::deserialize(&packet.raw_payload)?;
     dbg!(&payload);
