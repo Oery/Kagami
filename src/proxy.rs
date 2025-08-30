@@ -111,18 +111,20 @@ async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::i
 
     println!("Writing Packet");
 
-    // FIXME:
-    // SetCompression is sent to the client after the state has changed
+    // FIXME: Ugly Workaround
+    // -- SetCompression is sent to the client after the state has changed
     // This causes the packet to be compressed before comp was enabled for client
-    // and results in a client crash
-    // (Maybe set a flag to keep track of the state the packet arrived in)
+    //  and results in a client crash
+    // -- (Maybe set a flag to keep track of the state the packet arrived in)
     let state = ctx.state.load(Ordering::Relaxed);
-    if threshold == -1 || (packet.id == 3 && state == State::Login) {
+    let is_setcompression = packet.id == 3 && state == State::Login;
+
+    if threshold == -1 || is_setcompression {
         ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;
         ctx.dst.writer.write(&packet_id).await?;
         ctx.dst.writer.write(&packet.raw_payload).await?;
         return Ok(());
-    } 
+    }
 
     println!("PACKET_LENGTH={packet_len} | THRESHOLD={threshold}");
     if packet_len < threshold as usize {
