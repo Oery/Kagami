@@ -76,11 +76,11 @@ async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Resul
 
     use crate::context::Source::*;
 
-    match (&ctx.source, state, packet.id) {
-        (Client, State::Handshake, 0x00) => handle_payload::<Handshake>(ctx, packet).await,
-        (Server, State::Login, 0x02) => handle_payload::<LoginSuccess>(ctx, packet).await,
-        (Server, State::Login, 0x03) => handle_payload::<SetCompression>(ctx, packet).await,
-        (Server, State::Play, 0x46) => handle_payload::<SetCompression>(ctx, packet).await,
+    match (packet.id, &ctx.source, state) {
+        (0x00, Client, State::Handshake) => handle_payload::<Handshake>(ctx, packet).await,
+        (0x02, Server, State::Login) => handle_payload::<LoginSuccess>(ctx, packet).await,
+        (0x03, Server, State::Login) => handle_payload::<SetCompression>(ctx, packet).await,
+        (0x46, Server, State::Play) => handle_payload::<SetCompression>(ctx, packet).await,
         _ => Err(PacketError::UnknownPacket),
     }
 }
