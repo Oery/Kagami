@@ -64,8 +64,8 @@ impl<'a> Payload<'a> for Handshake<'a> {
         em.packet_events.client_handshake.push(f);
     }
 
-    fn has_events(em: &EventManager) -> bool {
-        !em.packet_events.client_handshake.is_empty()
+    fn has_events(_em: &EventManager) -> bool {
+        true
     }
 
     fn deserialize(input: &'a [u8]) -> PResult<Self> {
@@ -104,8 +104,8 @@ impl<'a> Payload<'a> for SetCompression {
         em.packet_events.server_setcompression.push(f);
     }
 
-    fn has_events(em: &EventManager) -> bool {
-        !em.packet_events.server_setcompression.is_empty()
+    fn has_events(_em: &EventManager) -> bool {
+        true
     }
 
     fn serialize(&self, _buf: &mut [u8]) -> PResult<()> {
@@ -142,8 +142,8 @@ impl<'a> Payload<'a> for LoginSuccess<'a> {
         em.packet_events.server_loginsuccess.push(f);
     }
 
-    fn has_events(em: &EventManager) -> bool {
-        !em.packet_events.server_loginsuccess.is_empty()
+    fn has_events(_em: &EventManager) -> bool {
+        true
     }
 
     fn deserialize(input: &'a [u8]) -> PResult<Self> {
