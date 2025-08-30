@@ -85,10 +85,7 @@ async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Resul
     }
 }
 
-fn next_packet<'a, 'b>(
-    ctx: &'a ProxyContext<'a>,
-    input: &'b [u8],
-) -> PResult<Option<(&'b [u8], Packet<'b>)>> {
+fn next_packet<'a, 'b>(ctx: &ProxyContext<'_>, input: &'b [u8]) -> PResult<Option<(&'b [u8], Packet<'b>)>> {
     let cmp = ctx.compress_threshold.load(Ordering::Relaxed);
 
     match packet(input, cmp) {
