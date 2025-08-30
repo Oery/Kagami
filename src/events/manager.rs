@@ -1,4 +1,4 @@
-use crate::events::*;
+use crate::{events::*, proxy::Payload};
 
 #[derive(Default)]
 pub struct EventManager {
@@ -10,7 +10,7 @@ impl EventManager {
         &mut self,
         handler: impl for<'b> Fn(&mut Context<T::Item<'b>>) + Send + Sync + 'static,
     ) where
-        T: PacketEvent<'a> + 'a,
+        T: Payload<'a> + 'a,
     {
         T::register(self, Box::new(handler));
     }

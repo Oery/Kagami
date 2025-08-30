@@ -1,6 +1,6 @@
 use crate::context::ProxyContext;
-use crate::error::{KResult, KagamiError, PResult, PacketError};
-use crate::events::EventManager;
+use crate::error::{KResult, PResult, PacketError};
+use crate::events::{Context, EventManager};
 use crate::packet::{Packet, packet};
 use crate::packets::{Handshake, LoginSuccess, SetCompression};
 use crate::state::State;
@@ -25,10 +25,21 @@ const BUFFER_SIZE: usize = 128_000; // TODO: Measure what is needed
 
 use std::fmt::Debug;
 
+// TODO: Unstable
+// -- Check unstable associated type defaults feature flag
+
 pub trait Payload<'a>: Debug + Sized {
+    type Item<'b>: 'b;
+    type Handler;
+
     fn deserialize(raw_payload: &'a [u8]) -> PResult<Self>;
     fn serialize(&self, buf: &mut [u8]) -> PResult<()>;
+    fn has_events(em: &EventManager) -> bool;
     fn dispatch(self, ctx: &mut ProxyContext);
+    fn register(
+        em: &mut EventManager,
+        f: Box<dyn for<'b> Fn(&mut Context<Self::Item<'b>>) + Send + Sync + 'static>,
+    );
 }
 
 // TODO:

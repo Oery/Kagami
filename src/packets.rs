@@ -1,12 +1,10 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use nom::IResult;
-
 use crate::context::ProxyContext;
-use crate::error::{PResult, PacketError};
+use crate::error::PResult;
 use crate::events::*;
-use crate::packet::{short, string, varint_i32, state};
+use crate::packet::{short, state, string, varint_i32};
 use crate::proxy::Payload;
 use crate::state::State;
 
@@ -17,6 +15,17 @@ pub struct KeepAlive {
 }
 
 impl Payload<'_> for KeepAlive {
+    type Item<'b> = KeepAlive;
+    type Handler = Box<dyn for<'b> Fn(&mut Context<Self::Item<'b>>) + Send + Sync + 'static>;
+
+    fn register(em: &mut EventManager, f: Self::Handler) {
+        em.packet_events.client_keepalive.push(f);
+    }
+
+    fn has_events(em: &EventManager) -> bool {
+        !em.packet_events.client_keepalive.is_empty()
+    }
+
     fn deserialize(raw_payload: &[u8]) -> PResult<Self> {
         let (_, id) = varint_i32(raw_payload)?;
 
@@ -27,7 +36,7 @@ impl Payload<'_> for KeepAlive {
         // write_varint_i32(buf, id)?;
         // write_varint_i32(raw_payload, payload.id)?;
         //
-        Ok(())
+        todo!("Add Serialization support");
     }
 
     fn dispatch(self, ctx: &mut ProxyContext) {
@@ -48,6 +57,17 @@ pub struct Handshake<'a> {
 }
 
 impl<'a> Payload<'a> for Handshake<'a> {
+    type Item<'b> = Handshake<'b>;
+    type Handler = Box<dyn for<'b> Fn(&mut Context<Self::Item<'b>>) + Send + Sync + 'static>;
+
+    fn register(em: &mut EventManager, f: Self::Handler) {
+        em.packet_events.client_handshake.push(f);
+    }
+
+    fn has_events(em: &EventManager) -> bool {
+        !em.packet_events.client_handshake.is_empty()
+    }
+
     fn deserialize(input: &'a [u8]) -> PResult<Self> {
         let (input, protocol_version) = varint_i32(input)?;
         let (input, addr) = string(input)?;
@@ -58,10 +78,7 @@ impl<'a> Payload<'a> for Handshake<'a> {
     }
 
     fn serialize(&self, _buf: &mut [u8]) -> PResult<()> {
-        // write_varint_i32(buf, id)?;
-        // write_string
-        //
-        Ok(())
+        todo!("Add Serialization support");
     }
 
     fn dispatch(self, ctx: &mut ProxyContext) {
@@ -80,13 +97,24 @@ pub struct SetCompression {
 }
 
 impl<'a> Payload<'a> for SetCompression {
-    fn deserialize(input: &'a [u8]) -> PResult<Self> {
-        let (_, threshold) = varint_i32(input)?;
-        Ok(Self { threshold })
+    type Item<'b> = SetCompression;
+    type Handler = PacketEvent<Self>;
+
+    fn register(em: &mut EventManager, f: PacketEvent<Self>) {
+        em.packet_events.server_setcompression.push(f);
+    }
+
+    fn has_events(em: &EventManager) -> bool {
+        !em.packet_events.server_setcompression.is_empty()
     }
 
     fn serialize(&self, _buf: &mut [u8]) -> PResult<()> {
-        Ok(())
+        todo!("Add Serialization support");
+    }
+
+    fn deserialize(input: &'a [u8]) -> PResult<Self> {
+        let (_, threshold) = varint_i32(input)?;
+        Ok(Self { threshold })
     }
 
     fn dispatch(self, ctx: &mut ProxyContext) {
@@ -107,6 +135,17 @@ pub struct LoginSuccess<'a> {
 }
 
 impl<'a> Payload<'a> for LoginSuccess<'a> {
+    type Item<'b> = LoginSuccess<'b>;
+    type Handler = Box<dyn for<'b> Fn(&mut Context<LoginSuccess<'b>>) + Send + Sync + 'static>;
+
+    fn register(em: &mut EventManager, f: Self::Handler) {
+        em.packet_events.server_loginsuccess.push(f);
+    }
+
+    fn has_events(em: &EventManager) -> bool {
+        !em.packet_events.server_loginsuccess.is_empty()
+    }
+
     fn deserialize(input: &'a [u8]) -> PResult<Self> {
         let (input, uuid) = string(input)?;
         let (_, username) = string(input)?;
@@ -127,30 +166,3 @@ impl<'a> Payload<'a> for LoginSuccess<'a> {
         }
     }
 }
-
-// TODO: Generate this with a derive macro
-
-// impl<F> EventHandler<T: KeepAlive> for F
-// where
-//     F: Fn(&mut Context<KeepAlive>) + 'static,
-// {
-//     fn register(self, events: &mut Events) {
-//         events.client_keep_alive.push(Box::new(self));
-//     }
-// }
-//
-// impl Dispatchable for Context<'_, '_, KeepAlive> {
-//     fn dispatch(&self, ctx: &ProxyContext) {
-//         for event in &ctx.events.client_keep_alive {
-//             event(self);
-//         }
-//     }
-// }
-//
-// impl Dispatchable for KeepAlive {
-//     fn dispatch(&self, ctx: &ProxyContext) {
-//         for event in &ctx.events.client_keep_alive {
-//             event(self);
-//         }
-//     }
-// }
