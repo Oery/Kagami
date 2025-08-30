@@ -191,26 +191,6 @@ async fn handle_stream(ctx: &mut ProxyContext<'_>) -> KResult<()> {
     }
 }
 
-// TODO:
-// Handle this result to know why the connection ended, could be closed normally or
-// forcefully closed by an issue on our side, an io error, etc...
-//
-// async fn on_client_join<'a, 'b>(client: TcpStream, proxy: Arc<&'b Proxy<'b>>) -> KResult<()> {
-//     let server = TcpStream::connect(HOST).await?;
-//
-//     let (mut client_ctx, mut server_ctx) = Context::new(proxy, &client, &server);
-//     if let Err(e) = futures::try_join!(handle_stream(&mut client_ctx), handle_stream(&mut server_ctx)) {
-//         dbg!(e);
-//     }
-//
-//     let _ = client.shutdown(std::net::Shutdown::Both);
-//     let _ = server.shutdown(std::net::Shutdown::Both);
-//
-//     info!("Connection closed");
-//
-//     Ok(())
-// }
-//
 #[derive(Default)]
 pub struct Proxy {
     pub events: EventManager,
