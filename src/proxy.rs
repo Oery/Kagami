@@ -59,12 +59,13 @@ async fn handle_payload<'a, T: Payload<'a>>(
 
     return Err(PacketError::UnknownPacket);
 
-    // match payload {
-    // if Borrowed -> send packet and original payload
-    // if Owned -> Serialize Struct and send
-    // }
-
     // TODO: Serialize Packet
+    // -- We need to recreate raw_payload from the new packet struct
+    // Maybe check if any field has changed before, but might be tricky to implement
+
+    // TODO: Write Packet
+    // -- Packet is not currently not mutable, we need to check if it can be
+    //  If so, we can delegate the write_packet call to the handle packet fn
 
     // Ok(())
 }
@@ -95,12 +96,6 @@ fn next_packet<'a, 'b>(ctx: &ProxyContext<'_>, input: &'b [u8]) -> PResult<Optio
     }
 }
 
-// TODO:
-// If packet is raw, do this
-// Else Serialize data, get_length, then do it
-//
-// TODO:
-// Support Compression
 async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::io::Result<()> {
     let packet_id = temp_convert(packet.id)?;
     let packet_len = packet.raw_payload.len() + packet_id.len();
@@ -209,6 +204,10 @@ impl Proxy {
 
         Ok(())
     }
+
+    // TODO: Result to Handle
+    // -- Handle this result to know why the connection ended, could be closed normally or
+    // forcefully closed by an issue on our side, an io error, etc...
 
     pub async fn on_client_join(client: TcpStream, proxy: Arc<Proxy>) -> KResult<()> {
         let server = TcpStream::connect(HOST).await?;
