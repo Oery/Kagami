@@ -136,7 +136,7 @@ async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::i
     e.write_all(&packet.raw_payload)?;
     let compressed = e.finish()?;
 
-    let data_len = temp_convert(compressed.len() as i32)?;
+    let data_len = temp_convert(packet_len as i32)?;
     let packet_len = data_len.len() + compressed.len();
 
     ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;

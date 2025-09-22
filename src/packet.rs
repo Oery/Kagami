@@ -96,14 +96,13 @@ pub fn packet(input: &[u8], cmp: i32) -> IResult<&[u8], Packet> {
 pub fn compressed_packet(input: &[u8], size: usize) -> IResult<&[u8], (i32, Vec<u8>)> {
     println!("Decompressing Packet of size {size}, Input size: {}", input.len());
     let mut e = ZlibDecoder::new(input);
-    let mut raw_payload = vec![0; size];
-    e.read_exact(raw_payload.as_mut_slice())
-        .expect("Failed to read until end");
+    let mut data = vec![0; size];
+    e.read_exact(&mut data).expect("Failed to read until end");
 
-    let (_, id) = varint_i32(&raw_payload).expect("Failed to read id for compressed packet");
-    println!("Decompressed packet with id {id} and {raw_payload:?}");
+    let (raw_payload, id) = varint_i32(&data).expect("Failed to read id for compressed packet");
+    // println!("Decompressed packet with id {id}");
 
-    Ok((input, (id, raw_payload)))
+    Ok((input, (id, raw_payload.to_owned())))
 }
 
 pub fn i32_to_varint(mut value: i32) -> Vec<u8> {
