@@ -50,6 +50,7 @@ async fn handle_payload<'a, T: Payload<'a>>(
     packet: &'a Packet<'a>,
 ) -> PResult<()> {
     if !T::has_events(&ctx.proxy.events) {
+        write_packet(ctx, packet).await?;
         return Ok(());
     }
 
