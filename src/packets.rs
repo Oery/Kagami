@@ -4,9 +4,10 @@ use std::sync::atomic::Ordering;
 use crate::context::ProxyContext;
 use crate::error::PResult;
 use crate::events::*;
-use crate::packet::{short, state, string, varint_i32};
+use crate::packet::{Packet, short, state, string, varint_i32};
 use crate::proxy::Payload;
 use crate::state::State;
+use crate::varint::temp_convert;
 
 // #[packet(0x05, Play, Client)]
 #[derive(Debug)]
@@ -32,18 +33,20 @@ impl Payload<'_> for KeepAlive {
         Ok(Self { id })
     }
 
-    fn serialize(&self, _buf: &mut [u8]) -> PResult<()> {
-        // write_varint_i32(buf, id)?;
-        // write_varint_i32(raw_payload, payload.id)?;
-        //
+    fn serialize(&self) -> PResult<Packet<'_>> {
         todo!("Add Serialization support");
     }
 
-    fn dispatch(self, ctx: &mut ProxyContext) {
-        let mut packet_ctx = Context::new(self, &mut ctx.src);
+    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
+        let mut pctx = Context::new(self, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.client_keepalive {
-            event(&mut packet_ctx);
+            event(&mut pctx);
+        }
+
+        match pctx.should_filter {
+            true => None,
+            false => Some(pctx.payload),
         }
     }
 }
@@ -77,16 +80,21 @@ impl<'a> Payload<'a> for Handshake<'a> {
         Ok(Self { protocol_version, addr, port, next_state })
     }
 
-    fn serialize(&self, _buf: &mut [u8]) -> PResult<()> {
-        todo!("Add Serialization support");
+    fn serialize(&self) -> PResult<Packet<'_>> {
+        Err(crate::error::PacketError::Unsupported)
     }
 
-    fn dispatch(self, ctx: &mut ProxyContext) {
+    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
         ctx.state.store(self.next_state, Ordering::Relaxed);
         let mut pctx = Context::new(self, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.client_handshake {
             event(&mut pctx);
+        }
+
+        match pctx.should_filter {
+            true => None,
+            false => Some(pctx.payload),
         }
     }
 }
@@ -108,8 +116,8 @@ impl<'a> Payload<'a> for SetCompression {
         true
     }
 
-    fn serialize(&self, _buf: &mut [u8]) -> PResult<()> {
-        todo!("Add Serialization support");
+    fn serialize(&self) -> PResult<Packet<'_>> {
+        Err(crate::error::PacketError::Unsupported)
     }
 
     fn deserialize(input: &'a [u8]) -> PResult<Self> {
@@ -117,13 +125,18 @@ impl<'a> Payload<'a> for SetCompression {
         Ok(Self { threshold })
     }
 
-    fn dispatch(self, ctx: &mut ProxyContext) {
+    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
         ctx.compress_threshold.store(self.threshold, Ordering::Relaxed);
         println!("Compression was set to {}", self.threshold);
         let mut pctx = Context::new(self, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.server_setcompression {
             event(&mut pctx);
+        }
+
+        match pctx.should_filter {
+            true => None,
+            false => Some(pctx.payload),
         }
     }
 }
@@ -153,16 +166,24 @@ impl<'a> Payload<'a> for LoginSuccess<'a> {
         Ok(Self { uuid, username })
     }
 
-    fn serialize(&self, _buf: &mut [u8]) -> PResult<()> {
-        Ok(())
+    fn serialize(&self) -> PResult<Packet<'_>> {
+        Err(crate::error::PacketError::Unsupported)
     }
 
-    fn dispatch(self, ctx: &mut ProxyContext) {
+    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
         ctx.state.store(State::Play, Ordering::Relaxed);
         let mut pctx = Context::new(self, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.server_loginsuccess {
             event(&mut pctx);
         }
+
+        match pctx.should_filter {
+            true => None,
+            false => Some(pctx.payload),
+        }
+    }
+}
+
     }
 }

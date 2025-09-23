@@ -33,9 +33,9 @@ pub trait Payload<'a>: Debug + Sized {
     type Handler;
 
     fn deserialize(raw_payload: &'a [u8]) -> PResult<Self>;
-    fn serialize(&self, buf: &mut [u8]) -> PResult<()>;
+    fn serialize(&self) -> PResult<Packet<'_>>;
     fn has_events(em: &EventManager) -> bool;
-    fn dispatch(self, ctx: &mut ProxyContext);
+    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self>;
     fn register(
         em: &mut EventManager,
         f: Box<dyn for<'b> Fn(&mut Context<Self::Item<'b>>) + Send + Sync + 'static>,
@@ -55,20 +55,13 @@ async fn handle_payload<'a, T: Payload<'a>>(
     }
 
     let payload = T::deserialize(&packet.raw_payload)?;
-    dbg!(&payload);
-    payload.dispatch(ctx);
 
-    return Err(PacketError::UnknownPacket);
+    if let Some(payload) = payload.dispatch(ctx) {
+        let packet = payload.serialize()?;
+        write_packet(ctx, &packet).await?;
+    }
 
-    // TODO: Serialize Packet
-    // -- We need to recreate raw_payload from the new packet struct
-    // Maybe check if any field has changed before, but might be tricky to implement
-
-    // TODO: Write Packet
-    // -- Packet is not currently not mutable, we need to check if it can be
-    //  If so, we can delegate the write_packet call to the handle packet fn
-
-    // Ok(())
+    Ok(())
 }
 
 async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Result<(), PacketError> {
