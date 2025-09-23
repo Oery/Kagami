@@ -164,7 +164,9 @@ async fn parse_buf(ctx: &mut ProxyContext<'_>, bytes: &[u8], buf_acc: &mut Vec<u
         bytes = slice;
     }
 
-    buf_acc.truncate(bytes.len());
+    let consumed = buf_acc.len() - bytes.len();
+    buf_acc.drain(..consumed);
+
     ctx.dst.writer.flush().await?;
     ctx.src.writer.flush().await?;
 
