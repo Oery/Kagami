@@ -185,5 +185,49 @@ impl<'a> Payload<'a> for LoginSuccess<'a> {
     }
 }
 
+#[derive(Debug)]
+pub struct Chat<'a> {
+    pub message: Cow<'a, str>,
+}
+
+impl<'a> Payload<'a> for Chat<'a> {
+    type Item<'b> = Chat<'b>;
+    type Handler = Box<dyn for<'b> Fn(&mut Context<Chat<'b>>) + Send + Sync + 'static>;
+
+    fn register(em: &mut EventManager, f: Self::Handler) {
+        em.packet_events.client_chat.push(f);
+    }
+
+    fn has_events(em: &EventManager) -> bool {
+        !em.packet_events.client_chat.is_empty()
+    }
+
+    fn deserialize(input: &'a [u8]) -> PResult<Self> {
+        let (_, message) = string(input)?;
+
+        Ok(Self { message })
+    }
+
+    fn serialize(&self) -> PResult<Packet<'_>> {
+        let mut raw_payload = vec![];
+        raw_payload.write(&temp_convert(self.message.len() as i32)?)?;
+        raw_payload.write(self.message.as_bytes())?;
+        let raw_payload: Cow<'_, [u8]> = raw_payload.into();
+
+        Ok(Packet { id: 0x01, raw_payload })
+    }
+
+    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
+        ctx.state.store(State::Play, Ordering::Relaxed);
+        let mut pctx = Context::new(self, &mut ctx.src);
+
+        for event in &ctx.proxy.events.packet_events.client_chat {
+            event(&mut pctx);
+        }
+
+        match pctx.should_filter {
+            true => None,
+            false => Some(pctx.payload),
+        }
     }
 }

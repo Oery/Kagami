@@ -2,7 +2,7 @@ use crate::context::ProxyContext;
 use crate::error::{KResult, PResult, PacketError};
 use crate::events::{Context, EventManager};
 use crate::packet::{Packet, packet};
-use crate::packets::{Handshake, LoginSuccess, SetCompression};
+use crate::packets::{Chat, Handshake, LoginSuccess, SetCompression};
 use crate::state::State;
 use crate::varint::temp_convert;
 
@@ -73,6 +73,7 @@ async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Resul
 
     match (packet.id, &ctx.source, state) {
         (0x00, Client, State::Handshake) => handle_payload::<Handshake>(ctx, packet).await,
+        (0x01, Client, State::Play) => handle_payload::<Chat>(ctx, packet).await,
         (0x02, Server, State::Login) => handle_payload::<LoginSuccess>(ctx, packet).await,
         (0x03, Server, State::Login) => handle_payload::<SetCompression>(ctx, packet).await,
         (0x46, Server, State::Play) => handle_payload::<SetCompression>(ctx, packet).await,
