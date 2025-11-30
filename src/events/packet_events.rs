@@ -17,4 +17,5 @@ pub struct PacketEvents {
     pub client_chat: Vec<ChatEvent>,
     pub server_setcompression: Vec<PacketEvent<SetCompression>>,
     pub server_loginsuccess: Vec<LoginSuccessEvent>,
+    pub server_chat: Vec<PacketEvent<ServerChat>>,
 }

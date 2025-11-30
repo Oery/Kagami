@@ -231,3 +231,62 @@ impl<'a> Payload<'a> for Chat<'a> {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChatComponent {}
+
+#[derive(Debug)]
+pub struct ServerChat {
+    pub json: String,
+    // pub json: ChatComponent,
+    pub position: u8,
+}
+
+impl<'a> ServerPacket<'a> for ServerChat {}
+
+impl<'a> Payload<'a> for ServerChat {
+    type Item<'b> = ServerChat;
+    type Handler = Box<dyn for<'b> Fn(&mut Context<ServerChat>) + Send + Sync + 'static>;
+
+    fn register(em: &mut EventManager, f: Self::Handler) {
+        em.packet_events.server_chat.push(f);
+    }
+
+    fn has_events(em: &EventManager) -> bool {
+        !em.packet_events.server_chat.is_empty()
+    }
+
+    fn deserialize(input: &'a [u8]) -> PResult<Self> {
+        let (input, json) = string(input)?;
+        let (_, position) = take(1usize)(input)?;
+        let position = position[0];
+        // let json = serde_json::from_str(&json).expect("String is not valid json");
+        let json = json.to_string();
+
+        Ok(Self { json, position })
+    }
+
+    fn serialize(&self) -> PResult<Packet<'_>> {
+        let mut raw_payload = vec![];
+        raw_payload.write(&temp_convert(self.json.len() as i32)?)?;
+        raw_payload.write(self.json.as_bytes())?;
+        raw_payload.write(&[self.position])?;
+        let raw_payload: Cow<'_, [u8]> = raw_payload.into();
+
+        Ok(Packet { id: 0x02, raw_payload })
+    }
+
+    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
+        ctx.state.store(State::Play, Ordering::Relaxed);
+        let mut pctx = Context::new(self, &mut ctx.dst, &mut ctx.src);
+
+        for event in &ctx.proxy.events.packet_events.server_chat {
+            event(&mut pctx);
+        }
+
+        match pctx.should_filter {
+            true => None,
+            false => Some(pctx.payload),
+        }
+    }
+}
