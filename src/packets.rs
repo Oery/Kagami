@@ -1,4 +1,8 @@
+use nom::bytes::streaming::take;
+use serde::{Deserialize, Serialize};
+
 use std::borrow::Cow;
+use std::io::Write;
 use std::sync::atomic::Ordering;
 
 use crate::context::ProxyContext;
@@ -38,7 +42,7 @@ impl Payload<'_> for KeepAlive {
     }
 
     fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
-        let mut pctx = Context::new(self, &mut ctx.src);
+        let mut pctx = Context::new(self, &mut ctx.dst, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.client_keepalive {
             event(&mut pctx);
@@ -86,7 +90,7 @@ impl<'a> Payload<'a> for Handshake<'a> {
 
     fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
         ctx.state.store(self.next_state, Ordering::Relaxed);
-        let mut pctx = Context::new(self, &mut ctx.src);
+        let mut pctx = Context::new(self, &mut ctx.src, &mut ctx.dst);
 
         for event in &ctx.proxy.events.packet_events.client_handshake {
             event(&mut pctx);
@@ -127,8 +131,7 @@ impl<'a> Payload<'a> for SetCompression {
 
     fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
         ctx.compress_threshold.store(self.threshold, Ordering::Relaxed);
-        println!("Compression was set to {}", self.threshold);
-        let mut pctx = Context::new(self, &mut ctx.src);
+        let mut pctx = Context::new(self, &mut ctx.dst, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.server_setcompression {
             event(&mut pctx);
@@ -172,7 +175,7 @@ impl<'a> Payload<'a> for LoginSuccess<'a> {
 
     fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
         ctx.state.store(State::Play, Ordering::Relaxed);
-        let mut pctx = Context::new(self, &mut ctx.src);
+        let mut pctx = Context::new(self, &mut ctx.dst, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.server_loginsuccess {
             event(&mut pctx);
@@ -189,6 +192,8 @@ impl<'a> Payload<'a> for LoginSuccess<'a> {
 pub struct Chat<'a> {
     pub message: Cow<'a, str>,
 }
+
+impl<'a> ClientPacket<'a> for Chat<'a> {}
 
 impl<'a> Payload<'a> for Chat<'a> {
     type Item<'b> = Chat<'b>;
@@ -208,6 +213,8 @@ impl<'a> Payload<'a> for Chat<'a> {
         Ok(Self { message })
     }
 
+    // TODO: Check for self.message len and log a warning if it's larger than max mc size
+    // > Then truncate the string (watchout if json)
     fn serialize(&self) -> PResult<Packet<'_>> {
         let mut raw_payload = vec![];
         raw_payload.write(&temp_convert(self.message.len() as i32)?)?;
@@ -219,7 +226,7 @@ impl<'a> Payload<'a> for Chat<'a> {
 
     fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
         ctx.state.store(State::Play, Ordering::Relaxed);
-        let mut pctx = Context::new(self, &mut ctx.src);
+        let mut pctx = Context::new(self, &mut ctx.src, &mut ctx.dst);
 
         for event in &ctx.proxy.events.packet_events.client_chat {
             event(&mut pctx);

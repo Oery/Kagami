@@ -21,7 +21,7 @@ use tracing::info;
 
 const HOST: &str = "127.0.0.1:25565";
 const PROXY: &str = "127.0.0.1:25566";
-const BUFFER_SIZE: usize = 128_000; // TODO: Measure what is needed
+const BUFFER_SIZE: usize = 10_000_000; // TODO: Measure what is needed
 
 use std::fmt::Debug;
 
@@ -65,9 +65,10 @@ async fn handle_payload<'a, T: Payload<'a>>(
 }
 
 async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Result<(), PacketError> {
-    println!("Received Packet: {packet:?}");
+    // println!("=========================================");
+    // println!("Received Packet: {packet:?}");
     let state = ctx.state.load(Ordering::Relaxed);
-    println!("State: {state:?}, Source: {:?}", ctx.source);
+    // println!("State: {state:?}, Source: {:?}", ctx.source);
 
     use crate::context::Source::*;
 
@@ -78,6 +79,7 @@ async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Resul
         (0x03, Server, State::Login) => handle_payload::<SetCompression>(ctx, packet).await,
         (0x02, Server, State::Play) => handle_payload::<ServerChat>(ctx, packet).await,
         (0x46, Server, State::Play) => handle_payload::<SetCompression>(ctx, packet).await,
+
         _ => Err(PacketError::UnknownPacket),
     }
 }
@@ -97,7 +99,7 @@ async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::i
     let packet_len = packet.raw_payload.len() + packet_id.len();
     let threshold = ctx.compress_threshold.load(Ordering::Relaxed);
 
-    println!("Writing Packet");
+    // println!("Writing Packet");
 
     // FIXME: Ugly Workaround
     // -- SetCompression is sent to the client after the state has changed
@@ -114,10 +116,10 @@ async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::i
         return Ok(());
     }
 
-    println!("PACKET_LENGTH={packet_len} | THRESHOLD={threshold}");
+    // println!("PACKET_LENGTH={packet_len} | THRESHOLD={threshold}");
     if packet_len < threshold as usize {
         let packet_len = packet_len + 1;
-        println!("Writing Packet with ID = {} and size {packet_len}", packet.id);
+        // println!("Writing Packet with ID = {} and size {packet_len}", packet.id);
         ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;
         ctx.dst.writer.write(&temp_convert(0)?).await?;
         ctx.dst.writer.write(&packet_id).await?;
@@ -125,8 +127,9 @@ async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::i
         return Ok(());
     }
 
-    println!("Writing Compressed Packet");
+    // println!("Writing Compressed Packet");
 
+    // FIXME: Where is uncompressed size ?
     let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
     e.write_all(&packet_id)?;
     e.write_all(&packet.raw_payload)?;
@@ -134,6 +137,9 @@ async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::i
 
     let data_len = temp_convert(packet_len as i32)?;
     let packet_len = data_len.len() + compressed.len();
+
+    // println!("Uncompressed size is {}", packet_len);
+    // dbg!(&data_len);
 
     ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;
     ctx.dst.writer.write(&data_len).await?;

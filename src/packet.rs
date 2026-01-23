@@ -52,7 +52,7 @@ pub fn short(input: &[u8]) -> IResult<&[u8], i16> {
     Ok((input, val))
 }
 
-pub fn string(input: &[u8]) -> IResult<&[u8], Cow<str>> {
+pub fn string(input: &[u8]) -> IResult<&[u8], Cow<'_, str>> {
     let (input, length) = varint_i32(input)?;
     let (input, content) = take(length as usize)(input)?;
 
@@ -64,12 +64,15 @@ pub fn string(input: &[u8]) -> IResult<&[u8], Cow<str>> {
     Ok((input, Cow::from(string)))
 }
 
-pub fn packet(input: &[u8], cmp: i32) -> IResult<&[u8], Packet> {
-    println!("INPUT: {input:?}");
+pub fn packet(input: &[u8], cmp: i32) -> IResult<&[u8], Packet<'_>> {
+    // println!("INPUT: {input:?}");
     let (input, length) = varint_i32(input)?;
     let (input, packet) = take(length as usize)(input)?;
 
-    println!("a Packet: {length}, {packet:?}");
+    // println!("a Packet: {length}");
+
+    // TODO: Load CMP here
+    // -> It would avoid loading it when a packet is not full
 
     // Compression is off
     if cmp == -1 {
@@ -78,15 +81,21 @@ pub fn packet(input: &[u8], cmp: i32) -> IResult<&[u8], Packet> {
         return Ok((input, Packet { id, raw_payload }));
     }
 
+    // println!("Compression is enabled. Checking size...");
+
     let (data, size) = varint_i32(packet)?;
-    println!("Compressed Packet: {size:?}, {data:?}");
+    // println!("Size: {size:?}");
 
     // Packet too small, not compressed
     if size == 0 {
+        // println!("Packet was not compressed");
         let (raw_payload, id) = varint_i32(data)?;
         let raw_payload: Cow<'_, [u8]> = raw_payload.into();
+        // println!("Packet: {id}");
         return Ok((input, Packet { id, raw_payload }));
     }
+
+    // println!("Bytes: {:?}", &data[0..10]);
 
     let (_, (id, raw_payload)) = compressed_packet(data, size as usize)?;
 
@@ -94,13 +103,13 @@ pub fn packet(input: &[u8], cmp: i32) -> IResult<&[u8], Packet> {
 }
 
 pub fn compressed_packet(input: &[u8], size: usize) -> IResult<&[u8], (i32, Vec<u8>)> {
-    println!("Decompressing Packet of size {size}, Input size: {}", input.len());
+    // println!("Decompressing Packet of size {size}, Input size: {}", input.len());
     let mut e = ZlibDecoder::new(input);
     let mut data = vec![0; size];
     e.read_exact(&mut data).expect("Failed to read until end");
 
     let (raw_payload, id) = varint_i32(&data).expect("Failed to read id for compressed packet");
-    // println!("Decompressed packet with id {id}");
+    // println!("Decompressed packet with id 0x{id:2X}");
 
     Ok((input, (id, raw_payload.to_owned())))
 }
@@ -124,4 +133,23 @@ pub fn i32_to_varint(mut value: i32) -> Vec<u8> {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::varint_i32;
+
+    #[test]
+    fn test_varint_i32_parsing() {
+        let bytes = [128, 2];
+        let result = varint_i32(&bytes).expect("Failed to parse varint").1;
+        assert_eq!(result, 256);
+    }
+
+    #[test]
+    fn test_varint_i32_parsing_long() {
+        let bytes = [252, 174, 2];
+        let result = varint_i32(&bytes).expect("Failed to parse varint").1;
+        assert_eq!(result, 38_780);
+    }
 }
