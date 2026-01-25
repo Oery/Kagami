@@ -4,6 +4,8 @@ use crate::{
     varint::temp_convert,
 };
 
+use crate::packets::*;
+
 use async_std::io::WriteExt;
 
 pub struct Context<'a, 'b, T> {
@@ -46,6 +48,10 @@ impl<'a, 'b> Client<'a, 'b> {
             self.0.writer.write(&packet_id).await.unwrap();
             self.0.writer.write(&packet.raw_payload).await.unwrap();
         })
+    }
+
+    pub fn chat(&mut self, message: &str) {
+        self.send(&ServerChat { json: format!("'{message}'"), position: 0 });
     }
 }
 
