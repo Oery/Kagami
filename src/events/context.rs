@@ -29,7 +29,7 @@ impl<'a, 'b, T> Context<'a, 'b, T> {
         }
     }
 
-    pub fn cancel(&mut self) {
+    pub fn cancel_packet(&mut self) {
         self.cancel = true;
     }
 }

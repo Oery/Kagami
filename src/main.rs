@@ -15,12 +15,12 @@ mod state;
 mod varint;
 
 fn handle_ping(ctx: &mut Context<Chat>) {
-    ctx.cancel();
-    ctx.client.chat("Pong!");
+    ctx.cancel_packet(); // Cancel the packet so that it is not sent to the server
+    ctx.client.chat("Pong!"); // Send a chat message to the client
 }
 
 fn handle_hello_world(ctx: &mut Context<Chat>) {
-    ctx.cancel();
+    ctx.cancel_packet();
     ctx.client.chat("Hello, World!");
 }
 
