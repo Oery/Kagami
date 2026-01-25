@@ -12,7 +12,7 @@ pub struct Context<'a, 'b, T> {
     pub payload: T,
     pub client: Client<'a, 'b>,
     pub server: Server<'a, 'b>,
-    pub should_filter: bool,
+    pub cancel: bool,
 }
 
 impl<'a, 'b, T> Context<'a, 'b, T> {
@@ -25,8 +25,12 @@ impl<'a, 'b, T> Context<'a, 'b, T> {
             payload,
             client: Client(client),
             server: Server(server),
-            should_filter: false,
+            cancel: false,
         }
+    }
+
+    pub fn cancel(&mut self) {
+        self.cancel = true;
     }
 }
 

@@ -48,7 +48,7 @@ impl Payload<'_> for KeepAlive {
             event(&mut pctx);
         }
 
-        match pctx.should_filter {
+        match pctx.cancel {
             true => None,
             false => Some(pctx.payload),
         }
@@ -96,7 +96,7 @@ impl<'a> Payload<'a> for Handshake<'a> {
             event(&mut pctx);
         }
 
-        match pctx.should_filter {
+        match pctx.cancel {
             true => None,
             false => Some(pctx.payload),
         }
@@ -137,7 +137,7 @@ impl<'a> Payload<'a> for SetCompression {
             event(&mut pctx);
         }
 
-        match pctx.should_filter {
+        match pctx.cancel {
             true => None,
             false => Some(pctx.payload),
         }
@@ -181,7 +181,7 @@ impl<'a> Payload<'a> for LoginSuccess<'a> {
             event(&mut pctx);
         }
 
-        match pctx.should_filter {
+        match pctx.cancel {
             true => None,
             false => Some(pctx.payload),
         }
@@ -232,7 +232,7 @@ impl<'a> Payload<'a> for Chat<'a> {
             event(&mut pctx);
         }
 
-        match pctx.should_filter {
+        match pctx.cancel {
             true => None,
             false => Some(pctx.payload),
         }
@@ -291,7 +291,7 @@ impl<'a> Payload<'a> for ServerChat {
             event(&mut pctx);
         }
 
-        match pctx.should_filter {
+        match pctx.cancel {
             true => None,
             false => Some(pctx.payload),
         }
