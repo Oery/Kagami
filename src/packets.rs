@@ -243,10 +243,10 @@ impl<'a> Payload<'a> for Chat<'a> {
 pub struct ChatComponent {}
 
 #[derive(Debug)]
-pub struct ServerChat {
-    pub json: String,
-    // pub json: ChatComponent,
+pub struct ServerChat<'a> {
+    pub json: Cow<'a, str>,
     pub position: u8,
+    // pub json: ChatComponent,
 }
 
 impl<'a> ServerPacket<'a> for ServerChat {}

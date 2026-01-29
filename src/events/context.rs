@@ -55,7 +55,7 @@ impl<'a, 'b> Client<'a, 'b> {
     }
 
     pub fn chat(&mut self, message: &str) {
-        self.send(&ServerChat { json: format!("'{message}'"), position: 0 });
+        self.send(&ServerChat { json: format!("'{message}'").into(), position: 0 });
     }
 }
 
