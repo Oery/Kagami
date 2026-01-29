@@ -54,6 +54,9 @@ fn get_ser_fn(ty: &Type, name: &Ident) -> proc_macro2::TokenStream {
                 "u8" => quote::quote! {
                     raw_payload.write(&[self.#name])?;
                 },
+                "i16" => quote::quote! {
+                    raw_payload.write(&self.#name.to_be_bytes())?;
+                },
                 "i32" => quote::quote! {
                     raw_payload.write(&temp_convert(self.#name)?)?;
                 },
@@ -92,6 +95,7 @@ fn get_deser_fn(ty: &Type, name: &Ident) -> proc_macro2::TokenStream {
                     let #name = #name[0];
                 },
                 "i32" => quote::quote! { varint_i32(input)?; },
+                "i16" => quote::quote! { short(input)?; },
                 "String" => quote::quote! { string(input)?; },
                 "Cow" => quote::quote! { string(input)?; },
 
