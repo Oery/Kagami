@@ -1,9 +1,7 @@
+use crate::error::KagamiError;
 use crate::events::Context;
-use error::KagamiError;
-
-use proxy::Proxy;
-
 use crate::packets::*;
+use crate::proxy::Proxy;
 
 mod context;
 mod error;
@@ -27,10 +25,6 @@ fn handle_hello_world(ctx: &mut Context<Chat>) {
 #[async_std::main]
 async fn main() -> Result<(), KagamiError> {
     let mut app = Proxy::new();
-
-    app.events.on_packet::<LoginSuccess>(|ctx| {
-        dbg!(&ctx.payload);
-    });
 
     app.events.on_packet::<Chat>(|ctx| {
         match ctx.payload.message.as_ref() {

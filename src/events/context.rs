@@ -1,10 +1,9 @@
 use crate::{
     context::{BufferedStream, State},
     events::{ClientPacket, ServerPacket},
+    packets::*,
     varint::temp_convert,
 };
-
-use crate::packets::*;
 
 use async_std::io::WriteExt;
 
@@ -82,6 +81,6 @@ impl<'a, 'b> Server<'a, 'b> {
             self.0.writer.write(&temp_convert(0).unwrap()).await.unwrap();
             self.0.writer.write(&packet_id).await.unwrap();
             self.0.writer.write(&packet.raw_payload).await.unwrap();
-        })
+        });
     }
 }

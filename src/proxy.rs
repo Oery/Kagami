@@ -124,7 +124,7 @@ async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::i
         let packet_len = packet_len + 1;
         // println!("Writing Packet with ID = {} and size {packet_len}", packet.id);
         ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;
-        ctx.dst.writer.write(&temp_convert(0)?).await?;
+        ctx.dst.writer.write(&[0]).await?;
         ctx.dst.writer.write(&packet_id).await?;
         ctx.dst.writer.write(&packet.raw_payload).await?;
         return Ok(());
