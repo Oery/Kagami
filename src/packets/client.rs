@@ -19,17 +19,6 @@ pub struct Handshake<'a> {
     pub next_state: McState,
 }
 
-#[packet(Login, 0x02, Server)]
-pub struct LoginSuccess<'a> {
-    pub uuid: Cow<'a, str>,
-    pub username: Cow<'a, str>,
-}
-
-#[packet(Login, 0x03, Server)]
-pub struct SetCompression {
-    pub threshold: i32,
-}
-
 #[packet(Play, 0x01, Client)]
 pub struct Chat<'a> {
     pub message: Cow<'a, str>,
@@ -38,10 +27,4 @@ pub struct Chat<'a> {
 #[packet(Play, 0x05, Client)]
 pub struct KeepAlive {
     pub id: i32,
-}
-
-#[packet(Play, 0x02, Server)]
-pub struct ServerChat<'a> {
-    pub json: Cow<'a, str>,
-    pub position: u8,
 }

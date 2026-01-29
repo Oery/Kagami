@@ -1,6 +1,6 @@
 use crate::error::KagamiError;
 use crate::events::Context;
-use crate::packets::*;
+use crate::packets::client::Chat;
 use crate::proxy::Proxy;
 
 mod context;
