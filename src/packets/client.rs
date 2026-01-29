@@ -3,13 +3,9 @@ use kagami_macros::packet;
 use std::borrow::Cow;
 use std::io::Write;
 
-use crate::context::ProxyContext;
-use crate::error::PResult;
 use crate::events::*;
-use crate::packet::{Packet, short, state, string, varint_i32};
-use crate::proxy::{Dispatch, Payload};
-use crate::state::McState;
-use crate::varint::temp_convert;
+use crate::packet::*;
+use crate::state::*;
 
 #[packet(Handshake, 0x00, Client)]
 pub struct Handshake<'a> {

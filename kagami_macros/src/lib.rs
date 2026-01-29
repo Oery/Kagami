@@ -58,18 +58,18 @@ fn get_ser_fn(ty: &Type, name: &Ident) -> proc_macro2::TokenStream {
                     raw_payload.write(&self.#name.to_be_bytes())?;
                 },
                 "i32" => quote::quote! {
-                    raw_payload.write(&temp_convert(self.#name)?)?;
+                    raw_payload.write(&crate::varint::temp_convert(self.#name)?)?;
                 },
                 "String" => quote::quote! {
-                    raw_payload.write(&temp_convert(self.#name.len() as i32)?)?;
+                    raw_payload.write(&crate::varint::temp_convert(self.#name.len() as i32)?)?;
                     raw_payload.write(self.#name.as_bytes())?;
                 },
                 "Cow" => quote::quote! {
-                    raw_payload.write(&temp_convert(self.#name.len() as i32)?)?;
+                    raw_payload.write(&crate::varint::temp_convert(self.#name.len() as i32)?)?;
                     raw_payload.write(self.#name.as_bytes())?;
                 },
                 "McState" => quote::quote! {
-                    raw_payload.write(&temp_convert(self.#name as i32)?)?;
+                    raw_payload.write(&crate::varint::temp_convert(self.#name as i32)?)?;
                 },
 
                 _ => quote::quote! {
@@ -184,14 +184,14 @@ fn get_payload_impl(item: &DeriveInput, origin: &Origin, id: i32) -> proc_macro2
     let field_names = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
 
     let deserializer = quote! {
-        fn deserialize(input: &'a [u8]) -> PResult<Self> {
+        fn deserialize(input: &'a [u8]) -> crate::error::PResult<Self> {
             #( #field_desers )*
 
             Ok(Self { #( #field_names ),* })
         }
     };
 
-    let (_, ty_generics, where_clause) = generics.split_for_impl();
+    let (_, ty_generics, _) = generics.split_for_impl();
 
     let item_type = match generics.lifetimes().next().is_some() {
         true => quote! { #name<'b> },
@@ -199,7 +199,7 @@ fn get_payload_impl(item: &DeriveInput, origin: &Origin, id: i32) -> proc_macro2
     };
 
     quote! {
-        impl<'a> Payload<'a> for #name #ty_generics #where_clause {
+        impl<'a> crate::proxy::Payload<'a> for #name #ty_generics {
             type Item<'b> = #item_type;
             type Handler = Box<dyn for<'b> Fn(&mut Context<#item_type>) + Send + Sync + 'static>;
 
@@ -213,7 +213,7 @@ fn get_payload_impl(item: &DeriveInput, origin: &Origin, id: i32) -> proc_macro2
 
             #deserializer
 
-            fn serialize(&self) -> PResult<Packet<'_>> {
+            fn serialize(&self) -> crate::error::PResult<Packet<'_>> {
                 let mut raw_payload = vec![];
                 #( #field_sers )*
                 let raw_payload: Cow<'_, [u8]> = raw_payload.into();
@@ -238,8 +238,8 @@ fn get_dispatch_impl(name: &Ident, origin: &Origin, generics: &Generics) -> proc
     };
 
     quote! {
-        impl<'a> Dispatch<'a> for #name #ty_generics {
-            fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
+        impl<'a> crate::proxy::Dispatch<'a> for #name #ty_generics {
+            fn dispatch(self, ctx: &mut crate::context::ProxyContext) -> Option<Self> {
                 let mut pctx = #new_pctx;
 
                 for event in &ctx.proxy.events.packet_events.#field {

@@ -3,12 +3,8 @@ use kagami_macros::packet;
 use std::borrow::Cow;
 use std::io::Write;
 
-use crate::context::ProxyContext;
-use crate::error::PResult;
 use crate::events::*;
-use crate::packet::{Packet, string, varint_i32};
-use crate::proxy::{Dispatch, Payload};
-use crate::varint::temp_convert;
+use crate::packet::*;
 
 #[packet(Login, 0x02, Server)]
 pub struct LoginSuccess<'a> {
