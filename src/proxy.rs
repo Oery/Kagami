@@ -35,17 +35,20 @@ pub trait Payload<'a>: Debug + Sized {
     fn deserialize(raw_payload: &'a [u8]) -> PResult<Self>;
     fn serialize(&self) -> PResult<Packet<'_>>;
     fn has_events(em: &EventManager) -> bool;
-    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self>;
     fn register(
         em: &mut EventManager,
         f: Box<dyn for<'b> Fn(&mut Context<Self::Item<'b>>) + Send + Sync + 'static>,
     );
 }
 
+pub trait Dispatch<'a>: Sized + Payload<'a> {
+    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self>;
+}
+
 // TODO: Use a RingBuffer
 // -- This would remove the need of copying bytes in an acc buffer
 
-async fn handle_payload<'a, T: Payload<'a>>(
+async fn handle_payload<'a, T: Dispatch<'a>>(
     ctx: &mut ProxyContext<'_>,
     packet: &'a Packet<'a>,
 ) -> PResult<()> {
@@ -194,7 +197,24 @@ pub struct Proxy {
 
 impl Proxy {
     pub fn new() -> Proxy {
-        Proxy { ..Default::default() }
+        let mut proxy = Proxy::default();
+
+        proxy.events.on_packet::<LoginSuccess>(|ctx| {
+            let state = McState::Play;
+            ctx.state.mc_state.store(state, Ordering::Relaxed);
+        });
+
+        proxy.events.on_packet::<Handshake>(|ctx| {
+            let state = ctx.payload.next_state;
+            ctx.state.mc_state.store(state, Ordering::Relaxed);
+        });
+
+        proxy.events.on_packet::<SetCompression>(|ctx| {
+            let threshold = ctx.payload.threshold;
+            ctx.state.compress_threshold.store(threshold, Ordering::Relaxed);
+        });
+
+        proxy
     }
 
     pub async fn run(self) -> KResult<()> {

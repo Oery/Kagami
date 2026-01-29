@@ -8,14 +8,15 @@ pub type PacketEvent<T> = Box<dyn for<'a> Fn(&mut Context<T>) + Send + Sync + 's
 //
 type HandshakeEvent = Box<dyn for<'a> Fn(&mut Context<Handshake<'a>>) + Send + Sync + 'static>;
 type LoginSuccessEvent = Box<dyn for<'a> Fn(&mut Context<LoginSuccess<'a>>) + Send + Sync + 'static>;
-type ChatEvent = Box<dyn for<'a> Fn(&mut Context<Chat<'a>>) + Send + Sync + 'static>;
+type ClientChatEvent = Box<dyn for<'a> Fn(&mut Context<Chat<'a>>) + Send + Sync + 'static>;
+type ServerChatEvent = Box<dyn for<'a> Fn(&mut Context<ServerChat<'a>>) + Send + Sync + 'static>;
 
 #[derive(Default)]
 pub struct PacketEvents {
     pub client_handshake: Vec<HandshakeEvent>,
-    pub client_keepalive: Vec<PacketEvent<KeepAlive>>,
-    pub client_chat: Vec<ChatEvent>,
-    pub server_setcompression: Vec<PacketEvent<SetCompression>>,
-    pub server_loginsuccess: Vec<LoginSuccessEvent>,
-    pub server_chat: Vec<PacketEvent<ServerChat>>,
+    pub client_keep_alive: Vec<PacketEvent<KeepAlive>>,
+    pub client_chat: Vec<ClientChatEvent>,
+    pub server_set_compression: Vec<PacketEvent<SetCompression>>,
+    pub server_login_success: Vec<LoginSuccessEvent>,
+    pub server_server_chat: Vec<ServerChatEvent>,
 }
