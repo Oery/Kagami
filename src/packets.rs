@@ -10,7 +10,7 @@ use crate::error::PResult;
 use crate::events::*;
 use crate::packet::{Packet, short, state, string, varint_i32};
 use crate::proxy::Payload;
-use crate::state::State;
+use crate::state::McState;
 use crate::varint::temp_convert;
 
 // #[packet(0x05, Play, Client)]
@@ -130,7 +130,9 @@ impl<'a> Payload<'a> for SetCompression {
     }
 
     fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
-        ctx.compress_threshold.store(self.threshold, Ordering::Relaxed);
+        ctx.state
+            .compress_threshold
+            .store(self.threshold, Ordering::Relaxed);
         let mut pctx = Context::new(self, &mut ctx.dst, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.server_setcompression {
@@ -174,7 +176,7 @@ impl<'a> Payload<'a> for LoginSuccess<'a> {
     }
 
     fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self> {
-        ctx.state.store(State::Play, Ordering::Relaxed);
+        ctx.state.mc_state.store(McState::Play, Ordering::Relaxed);
         let mut pctx = Context::new(self, &mut ctx.dst, &mut ctx.src);
 
         for event in &ctx.proxy.events.packet_events.server_loginsuccess {

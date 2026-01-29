@@ -3,7 +3,7 @@ use crate::error::{KResult, PResult, PacketError};
 use crate::events::{Context, EventManager};
 use crate::packet::{Packet, packet};
 use crate::packets::{Chat, Handshake, LoginSuccess, ServerChat, SetCompression};
-use crate::state::State;
+use crate::state::McState;
 use crate::varint::temp_convert;
 
 use std::io::Write;
@@ -67,25 +67,25 @@ async fn handle_payload<'a, T: Payload<'a>>(
 async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Result<(), PacketError> {
     // println!("=========================================");
     // println!("Received Packet: {packet:?}");
-    let state = ctx.state.load(Ordering::Relaxed);
+    let state = ctx.state.mc_state.load(Ordering::Relaxed);
     // println!("State: {state:?}, Source: {:?}", ctx.source);
 
     use crate::context::Source::*;
 
     match (packet.id, &ctx.source, state) {
-        (0x00, Client, State::Handshake) => handle_payload::<Handshake>(ctx, packet).await,
-        (0x01, Client, State::Play) => handle_payload::<Chat>(ctx, packet).await,
-        (0x02, Server, State::Login) => handle_payload::<LoginSuccess>(ctx, packet).await,
-        (0x03, Server, State::Login) => handle_payload::<SetCompression>(ctx, packet).await,
-        (0x02, Server, State::Play) => handle_payload::<ServerChat>(ctx, packet).await,
-        (0x46, Server, State::Play) => handle_payload::<SetCompression>(ctx, packet).await,
+        (0x00, Client, McState::Handshake) => handle_payload::<Handshake>(ctx, packet).await,
+        (0x01, Client, McState::Play) => handle_payload::<Chat>(ctx, packet).await,
+        (0x02, Server, McState::Login) => handle_payload::<LoginSuccess>(ctx, packet).await,
+        (0x03, Server, McState::Login) => handle_payload::<SetCompression>(ctx, packet).await,
+        (0x02, Server, McState::Play) => handle_payload::<ServerChat>(ctx, packet).await,
+        (0x46, Server, McState::Play) => handle_payload::<SetCompression>(ctx, packet).await,
 
         _ => Err(PacketError::UnknownPacket),
     }
 }
 
 fn next_packet<'a, 'b>(ctx: &ProxyContext<'_>, input: &'b [u8]) -> PResult<Option<(&'b [u8], Packet<'b>)>> {
-    let cmp = ctx.compress_threshold.load(Ordering::Relaxed);
+    let cmp = ctx.state.compress_threshold.load(Ordering::Relaxed);
 
     match packet(input, cmp) {
         Ok(data) => Ok(Some(data)),
@@ -97,7 +97,7 @@ fn next_packet<'a, 'b>(ctx: &ProxyContext<'_>, input: &'b [u8]) -> PResult<Optio
 async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::io::Result<()> {
     let packet_id = temp_convert(packet.id)?;
     let packet_len = packet.raw_payload.len() + packet_id.len();
-    let threshold = ctx.compress_threshold.load(Ordering::Relaxed);
+    let threshold = ctx.state.compress_threshold.load(Ordering::Relaxed);
 
     // println!("Writing Packet");
 
@@ -106,8 +106,8 @@ async fn write_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> std::i
     // This causes the packet to be compressed before comp was enabled for client
     //  and results in a client crash
     // -- (Maybe set a flag to keep track of the state the packet arrived in)
-    let state = ctx.state.load(Ordering::Relaxed);
-    let is_setcompression = packet.id == 3 && state == State::Login;
+    let state = ctx.state.mc_state.load(Ordering::Relaxed);
+    let is_setcompression = packet.id == 3 && state == McState::Login;
 
     if threshold == -1 || is_setcompression {
         ctx.dst.writer.write(&temp_convert(packet_len as i32)?).await?;

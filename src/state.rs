@@ -4,7 +4,7 @@ use strum::FromRepr;
 #[atomic_enum]
 #[derive(FromRepr, PartialEq)]
 #[repr(i32)]
-pub enum State {
+pub enum McState {
     Handshake = 0,
     Status = 1,
     Login = 2,

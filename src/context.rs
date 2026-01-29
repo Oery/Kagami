@@ -8,7 +8,7 @@ use async_std::{
 
 use crate::{
     proxy::Proxy,
-    state::{AtomicState, State},
+    state::{AtomicMcState, McState},
 };
 
 #[derive(Debug, PartialEq)]
@@ -23,12 +23,16 @@ impl fmt::Display for Source {
     }
 }
 
+pub struct State {
+    pub compress_threshold: Arc<AtomicI32>,
+    pub mc_state: Arc<AtomicMcState>,
+}
+
 pub struct ProxyContext<'a> {
     pub src: BufferedStream<'a>,
     pub dst: BufferedStream<'a>,
     pub source: Source,
-    pub compress_threshold: Arc<AtomicI32>,
-    pub state: Arc<AtomicState>,
+    pub state: State,
     pub proxy: Arc<Proxy>,
 }
 
@@ -48,25 +52,26 @@ impl<'a> BufferedStream<'a> {
 
 impl<'a> ProxyContext<'a> {
     pub fn new(client: &'a TcpStream, server: &'a TcpStream, proxy: Arc<Proxy>) -> (Self, Self) {
-        let state = Arc::new(AtomicState::new(State::Handshake));
+        let state = Arc::new(AtomicMcState::new(McState::Handshake));
         let compress_threshold = Arc::new(AtomicI32::new(-1));
 
         let client_ctx = ProxyContext {
             src: BufferedStream::new(client),
             dst: BufferedStream::new(server),
             source: Source::Client,
-            compress_threshold: compress_threshold.clone(),
-            state: state.clone(),
             proxy: proxy.clone(),
+            state: State {
+                compress_threshold: compress_threshold.clone(),
+                mc_state: state.clone(),
+            },
         };
 
         let server_ctx = ProxyContext {
             src: BufferedStream::new(server),
             dst: BufferedStream::new(client),
             source: Source::Server,
-            compress_threshold,
-            state,
             proxy,
+            state: State { compress_threshold, mc_state: state },
         };
 
         (client_ctx, server_ctx)

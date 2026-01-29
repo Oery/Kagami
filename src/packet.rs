@@ -7,7 +7,7 @@ use nom::IResult;
 use nom::bytes::streaming::take;
 use nom::error::{Error, ErrorKind};
 
-use crate::state::State;
+use crate::state::McState;
 
 #[derive(Debug, Default)]
 pub struct Packet<'a> {
@@ -36,10 +36,10 @@ pub fn varint_i32(mut input: &[u8]) -> IResult<&[u8], i32> {
     }
 }
 
-pub fn state(input: &[u8]) -> IResult<&[u8], State> {
+pub fn state(input: &[u8]) -> IResult<&[u8], McState> {
     let (input, discriminant) = varint_i32(input)?;
 
-    match State::from_repr(discriminant) {
+    match McState::from_repr(discriminant) {
         Some(val) => Ok((input, val)),
         None => Err(nom::Err::Error(Error { input, code: ErrorKind::Digit })),
     }
