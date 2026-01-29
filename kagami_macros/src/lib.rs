@@ -225,8 +225,8 @@ fn get_dispatch_impl(name: &Ident, origin: &Origin, generics: &Generics) -> proc
     let (_, ty_generics, _) = generics.split_for_impl();
 
     let new_pctx = match origin {
-        Origin::Client => quote! { Context::new(self, &mut ctx.src, &mut ctx.dst) },
-        Origin::Server => quote! { Context::new(self, &mut ctx.dst, &mut ctx.src) },
+        Origin::Client => quote! { Context::new(self, &mut ctx.src, &mut ctx.dst, &ctx.state) },
+        Origin::Server => quote! { Context::new(self, &mut ctx.dst, &mut ctx.src, &ctx.state) },
     };
 
     quote! {

@@ -1,5 +1,5 @@
 use crate::{
-    context::BufferedStream,
+    context::{BufferedStream, State},
     events::{ClientPacket, ServerPacket},
     varint::temp_convert,
 };
@@ -13,6 +13,7 @@ pub struct Context<'a, 'b, T> {
     pub client: Client<'a, 'b>,
     pub server: Server<'a, 'b>,
     pub cancel: bool,
+    pub state: State,
 }
 
 impl<'a, 'b, T> Context<'a, 'b, T> {
@@ -20,12 +21,17 @@ impl<'a, 'b, T> Context<'a, 'b, T> {
         payload: T,
         client: &'b mut BufferedStream<'a>,
         server: &'b mut BufferedStream<'a>,
+        state: &State,
     ) -> Context<'a, 'b, T> {
         Context {
             payload,
             client: Client(client),
             server: Server(server),
             cancel: false,
+            state: State {
+                mc_state: state.mc_state.clone(),
+                compress_threshold: state.compress_threshold.clone(),
+            },
         }
     }
 
