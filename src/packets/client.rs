@@ -15,6 +15,11 @@ pub struct Handshake<'a> {
     pub next_state: McState,
 }
 
+#[packet(Handshake, 0xFE, Client)]
+pub struct LegacyPing {
+    pub payload: u8,
+}
+
 #[packet(Play, 0x01, Client)]
 pub struct Chat<'a> {
     pub message: Cow<'a, str>,
