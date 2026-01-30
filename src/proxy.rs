@@ -28,6 +28,8 @@ use std::fmt::Debug;
 // TODO: Unstable
 // -- Check unstable associated type defaults feature flag
 
+include!(concat!(env!("OUT_DIR"), "/handle_packet.rs"));
+
 pub trait Payload<'a>: Debug + Sized {
     type Item<'b>: 'b;
     type Handler;
@@ -65,30 +67,6 @@ async fn handle_payload<'a, T: Dispatch<'a>>(
     }
 
     Ok(())
-}
-
-async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Result<(), PacketError> {
-    // println!("=========================================");
-    // println!("Received Packet: {packet:?}");
-    let state = ctx.state.mc_state.load(Ordering::Relaxed);
-    // println!("State: {state:?}, Source: {:?}", ctx.source);
-
-    use crate::context::Source::*;
-
-    match (packet.id, &ctx.source, state) {
-        (0x00, Client, McState::Handshake) => handle_payload::<Handshake>(ctx, packet).await,
-        (0xFE, Client, McState::Handshake) => handle_payload::<LegacyPing>(ctx, packet).await,
-        (0x01, Client, McState::Play) => handle_payload::<client::Chat>(ctx, packet).await,
-        (0x02, Server, McState::Login) => handle_payload::<LoginSuccess>(ctx, packet).await,
-        (0x03, Server, McState::Login) => handle_payload::<SetCompression>(ctx, packet).await,
-        (0x00, Server, McState::Play) => handle_payload::<server::KeepAlive>(ctx, packet).await,
-        // FIXME: Need to add support for non encoded i32s
-        // (0x01, Server, McState::Play) => handle_payload::<JoinGame>(ctx, packet).await,
-        (0x02, Server, McState::Play) => handle_payload::<server::Chat>(ctx, packet).await,
-        (0x46, Server, McState::Play) => handle_payload::<SetCompression>(ctx, packet).await,
-
-        _ => Err(PacketError::UnknownPacket),
-    }
 }
 
 fn next_packet<'a, 'b>(ctx: &ProxyContext<'_>, input: &'b [u8]) -> PResult<Option<(&'b [u8], Packet<'b>)>> {

@@ -409,6 +409,7 @@ dependencies = [
  "futures",
  "kagami_macros",
  "nom",
+ "quote",
  "serde",
  "serde_json",
  "strum",
