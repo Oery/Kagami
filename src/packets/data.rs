@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+// TODO: Add player sample
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Players {
     pub max: i32,
@@ -18,4 +19,5 @@ pub struct Response {
     pub description: String,
     pub players: Players,
     pub version: Version,
+    pub favicon: String,
 }
