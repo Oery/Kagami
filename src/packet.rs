@@ -6,6 +6,7 @@ use flate2::read::ZlibDecoder;
 use nom::IResult;
 use nom::bytes::streaming::take;
 use nom::error::{Error, ErrorKind};
+use serde::de::DeserializeOwned;
 
 use crate::state::McState;
 
@@ -62,6 +63,14 @@ pub fn string(input: &[u8]) -> IResult<&[u8], Cow<'_, str>> {
     };
 
     Ok((input, Cow::from(string)))
+}
+
+// TODO: Handle that unwrap
+pub fn json<T: DeserializeOwned>(input: &[u8]) -> IResult<&[u8], T> {
+    let (input, json) = string(input)?;
+    let v: T = serde_json::from_str(json.as_ref()).unwrap();
+
+    Ok((input, v))
 }
 
 pub fn packet(input: &[u8], cmp: i32) -> IResult<&[u8], Packet<'_>> {

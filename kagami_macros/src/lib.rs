@@ -29,6 +29,17 @@ enum State {
 enum Format {
     Standard,
     VarInt,
+    JSON,
+}
+
+impl From<&str> for Format {
+    fn from(s: &str) -> Self {
+        match s {
+            "varint" => Format::VarInt,
+            "json" => Format::JSON,
+            _ => Format::Standard,
+        }
+    }
 }
 
 fn to_snake_case(s: &str) -> String {
@@ -60,10 +71,7 @@ fn get_format(field: &Field) -> Format {
             return Format::Standard;
         };
 
-        return match format.value().as_ref() {
-            "varint" => Format::VarInt,
-            _ => Format::Standard,
-        };
+        return Format::from(format.value().as_ref());
     };
 
     return Format::Standard;
@@ -111,8 +119,13 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenStre
                     raw_payload.write(&crate::varint::temp_convert(self.#name as i32)?)?;
                 },
 
-                _ => quote::quote! {
-                    #ident
+                _ => match format {
+                    Format::JSON => quote::quote! {
+                        let j = serde_json::to_string(&self.#name).unwrap();
+                        raw_payload.write(&crate::varint::temp_convert(j.len() as i32)?)?;
+                        raw_payload.write(j.as_bytes())?;
+                    },
+                    _ => panic!("Type '{ident}' has no standard encoder"),
                 },
             }
         }
@@ -144,13 +157,19 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenSt
 
                 "i16" => quote::quote! { short(input)?; },
 
-                "String" => quote::quote! { string(input)?; },
+                "String" => match format {
+                    Format::Standard => quote::quote! { string(input)?; },
+                    _ => panic!("Unsupported format"),
+                },
 
                 "Cow" => quote::quote! { string(input)?; },
 
                 "McState" => quote::quote! { state(input)?; },
 
-                _ => panic!("Type '{ident}' has no standard encoder"),
+                _ => match format {
+                    Format::JSON => quote::quote! { json::<#ident>(input)?; },
+                    _ => panic!("Type '{ident}' has no standard encoder"),
+                },
             }
         }
         _ => quote::quote! {

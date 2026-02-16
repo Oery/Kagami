@@ -6,11 +6,13 @@ use std::io::Write;
 
 use crate::events::*;
 use crate::packet::*;
+use crate::packets::data::*;
 
-// TODO: Response is a JSON
+// TODO: Check if response can be zero copied
 #[packet(Status, 0x00, Server)]
-pub struct StatusResponse<'a> {
-    pub response: Cow<'a, str>,
+pub struct StatusResponse {
+    #[format = "json"]
+    pub response: Response,
 }
 
 #[packet(Login, 0x02, Server)]
