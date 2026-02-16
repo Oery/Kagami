@@ -7,6 +7,12 @@ use std::io::Write;
 use crate::events::*;
 use crate::packet::*;
 
+// TODO: Response is a JSON
+#[packet(Status, 0x00, Server)]
+pub struct StatusResponse<'a> {
+    pub response: Cow<'a, str>,
+}
+
 #[packet(Login, 0x02, Server)]
 pub struct LoginSuccess<'a> {
     pub uuid: Cow<'a, str>,
