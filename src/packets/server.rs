@@ -1,3 +1,4 @@
+use kagami_macros::Serializable;
 use kagami_macros::packet;
 
 use std::borrow::Cow;
@@ -14,17 +15,19 @@ pub struct LoginSuccess<'a> {
 
 #[packet(Login, 0x03, Server)]
 pub struct SetCompression {
+    #[format = "varint"]
     pub threshold: i32,
 }
 
 #[packet(Play, 0x00, Server)]
 pub struct KeepAlive {
+    #[format = "varint"]
     pub id: i32,
 }
 
-// FIXME: entity_id is not varint encoded
 #[packet(Play, 0x01, Server)]
 pub struct JoinGame<'a> {
+    #[format = "varint"]
     pub entity_id: i32,
     pub gamemode: u8,
     pub dimension: u8,

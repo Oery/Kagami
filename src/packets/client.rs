@@ -1,3 +1,4 @@
+use kagami_macros::Serializable;
 use kagami_macros::packet;
 
 use std::borrow::Cow;
@@ -9,6 +10,7 @@ use crate::state::*;
 
 #[packet(Handshake, 0x00, Client)]
 pub struct Handshake<'a> {
+    #[format = "varint"]
     pub protocol_version: i32,
     pub addr: Cow<'a, str>,
     pub port: i16,
@@ -27,5 +29,6 @@ pub struct Chat<'a> {
 
 #[packet(Play, 0x05, Client)]
 pub struct KeepAlive {
+    #[format = "varint"]
     pub id: i32,
 }

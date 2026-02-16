@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{Data, DeriveInput, Fields, Generics, Type, parse_macro_input};
+use syn::{Data, DeriveInput, Field, Fields, Generics, Type, parse_macro_input};
 
 enum Origin {
     Client,
@@ -26,22 +26,50 @@ enum State {
     Play = 3,
 }
 
+enum Format {
+    Standard,
+    VarInt,
+}
+
 fn to_snake_case(s: &str) -> String {
     let mut out = String::new();
     for (i, c) in s.chars().enumerate() {
-        if c.is_uppercase() {
-            if i != 0 {
-                out.push('_');
+        match c.is_uppercase() {
+            true => {
+                if i != 0 {
+                    out.push('_');
+                }
+                out.push(c.to_ascii_lowercase());
             }
-            out.push(c.to_ascii_lowercase());
-        } else {
-            out.push(c);
-        }
+            false => out.push(c),
+        };
     }
     out
 }
 
-fn get_ser_fn(ty: &Type, name: &Ident) -> proc_macro2::TokenStream {
+fn get_format(field: &Field) -> Format {
+    if let Some(mnv) = field.attrs.iter().find_map(|attr| match &attr.meta {
+        syn::Meta::NameValue(mnv) if mnv.path.is_ident("format") => Some(mnv),
+        _ => None,
+    }) {
+        let syn::Expr::Lit(lit) = &mnv.value else {
+            return Format::Standard;
+        };
+
+        let syn::Lit::Str(format) = &lit.lit else {
+            return Format::Standard;
+        };
+
+        return match format.value().as_ref() {
+            "varint" => Format::VarInt,
+            _ => Format::Standard,
+        };
+    };
+
+    return Format::Standard;
+}
+
+fn get_ser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenStream {
     match ty {
         Type::Path(type_path) => {
             let path = &type_path.path;
@@ -54,20 +82,31 @@ fn get_ser_fn(ty: &Type, name: &Ident) -> proc_macro2::TokenStream {
                 "u8" => quote::quote! {
                     raw_payload.write(&[self.#name])?;
                 },
+
                 "i16" => quote::quote! {
                     raw_payload.write(&self.#name.to_be_bytes())?;
                 },
-                "i32" => quote::quote! {
-                    raw_payload.write(&crate::varint::temp_convert(self.#name)?)?;
+
+                "i32" => match format {
+                    Format::VarInt => {
+                        quote::quote! { raw_payload.write(&crate::varint::temp_convert(self.#name)?)?; }
+                    }
+                    _ => panic!("Unsupported format"),
                 },
-                "String" => quote::quote! {
-                    raw_payload.write(&crate::varint::temp_convert(self.#name.len() as i32)?)?;
-                    raw_payload.write(self.#name.as_bytes())?;
+
+                "String" => match format {
+                    Format::Standard => quote::quote! {
+                        raw_payload.write(&crate::varint::temp_convert(self.#name.len() as i32)?)?;
+                        raw_payload.write(self.#name.as_bytes())?;
+                    },
+                    _ => panic!("Unsupported format"),
                 },
+
                 "Cow" => quote::quote! {
                     raw_payload.write(&crate::varint::temp_convert(self.#name.len() as i32)?)?;
                     raw_payload.write(self.#name.as_bytes())?;
                 },
+
                 "McState" => quote::quote! {
                     raw_payload.write(&crate::varint::temp_convert(self.#name as i32)?)?;
                 },
@@ -83,7 +122,7 @@ fn get_ser_fn(ty: &Type, name: &Ident) -> proc_macro2::TokenStream {
     }
 }
 
-fn get_deser_fn(ty: &Type, name: &Ident) -> proc_macro2::TokenStream {
+fn get_deser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenStream {
     match ty {
         Type::Path(type_path) => {
             let path = &type_path.path;
@@ -97,15 +136,21 @@ fn get_deser_fn(ty: &Type, name: &Ident) -> proc_macro2::TokenStream {
                     nom::bytes::streaming::take(1usize)(input)?;
                     let #name = #name[0];
                 },
-                "i32" => quote::quote! { varint_i32(input)?; },
+
+                "i32" => match format {
+                    Format::VarInt => quote::quote! { varint_i32(input)?; },
+                    _ => panic!("Unsupported format"),
+                },
+
                 "i16" => quote::quote! { short(input)?; },
+
                 "String" => quote::quote! { string(input)?; },
+
                 "Cow" => quote::quote! { string(input)?; },
+
                 "McState" => quote::quote! { state(input)?; },
 
-                _ => quote::quote! {
-                    #ident
-                },
+                _ => panic!("Type '{ident}' has no standard encoder"),
             }
         }
         _ => quote::quote! {
@@ -151,45 +196,13 @@ fn is_cow_str(ty: &Type) -> bool {
     cow_str(ty).is_some()
 }
 
-fn get_payload_impl(item: &DeriveInput, origin: &Origin, id: i32) -> proc_macro2::TokenStream {
+fn get_payload_impl(item: &DeriveInput, origin: &Origin) -> proc_macro2::TokenStream {
     let name = &item.ident;
-    let data = &item.data;
     let generics = &item.generics;
 
     let snake_name = to_snake_case(&name.to_string());
     let snake_orig = to_snake_case(&origin.to_string());
     let field = Ident::new(&format!("{snake_orig}_{snake_name}"), name.span());
-
-    let Data::Struct(data) = data else {
-        panic!("This is not a struct");
-    };
-
-    let Fields::Named(fields) = &data.fields else {
-        panic!("Fields should be named");
-    };
-
-    let field_desers = fields.named.iter().map(|field| {
-        let name = field.ident.as_ref().unwrap();
-        let deser_fn = get_deser_fn(&field.ty, name);
-        quote! {
-            let (input, #name) = #deser_fn
-        }
-    });
-
-    let field_sers = fields.named.iter().map(|field| {
-        let name = field.ident.as_ref().unwrap();
-        get_ser_fn(&field.ty, name)
-    });
-
-    let field_names = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
-
-    let deserializer = quote! {
-        fn deserialize(input: &'a [u8]) -> crate::error::PResult<Self> {
-            #( #field_desers )*
-
-            Ok(Self { #( #field_names ),* })
-        }
-    };
 
     let (_, ty_generics, _) = generics.split_for_impl();
 
@@ -210,17 +223,6 @@ fn get_payload_impl(item: &DeriveInput, origin: &Origin, id: i32) -> proc_macro2
             fn has_events(em: &EventManager) -> bool {
                 !em.packet_events.#field.is_empty()
             }
-
-            #deserializer
-
-            fn serialize(&self) -> crate::error::PResult<Packet<'_>> {
-                let mut raw_payload = vec![];
-                #( #field_sers )*
-                let raw_payload: Cow<'_, [u8]> = raw_payload.into();
-
-                Ok(Packet { id: #id, raw_payload })
-            }
-
         }
     }
 }
@@ -302,6 +304,62 @@ fn get_origin_impl(name: &Ident, origin: &Origin, generics: &Generics) -> proc_m
     }
 }
 
+#[proc_macro_derive(Serializable, attributes(format))]
+pub fn serializable(input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as DeriveInput);
+    let name = &item.ident;
+
+    let (_, ty_generics, _) = &item.generics.split_for_impl();
+
+    let Data::Struct(data) = &item.data else {
+        panic!("This is not a struct");
+    };
+
+    let Fields::Named(fields) = &data.fields else {
+        panic!("Fields should be named");
+    };
+
+    let field_desers = fields.named.iter().map(|field| {
+        let name = field.ident.as_ref().unwrap();
+        let format = get_format(field);
+        let deser_fn = get_deser_fn(&field.ty, name, format);
+
+        quote! {
+            let (input, #name) = #deser_fn
+        }
+    });
+
+    let field_sers = fields.named.iter().map(|field| {
+        let name = field.ident.as_ref().unwrap();
+        let format = get_format(field);
+        get_ser_fn(&field.ty, name, format)
+    });
+
+    let field_names = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
+
+    let deserializer = quote! {
+        fn deserialize(input: &'a [u8]) -> crate::error::PResult<Self> {
+            #( #field_desers )*
+
+            Ok(Self { #( #field_names ),* })
+        }
+    };
+
+    TokenStream::from(quote! {
+        impl<'a> crate::proxy::Serializable<'a> for #name #ty_generics {
+            #deserializer
+
+            fn serialize(&self) -> crate::error::PResult<Packet<'_>> {
+                let mut raw_payload = vec![];
+                #( #field_sers )*
+                let raw_payload: Cow<'_, [u8]> = raw_payload.into();
+
+                Ok(Packet { id: self.id(), raw_payload })
+            }
+        }
+    })
+}
+
 #[proc_macro_attribute]
 pub fn packet(attr: TokenStream, input: TokenStream) -> TokenStream {
     let PacketAttributes { state, id, origin } = parse_macro_input!(attr as PacketAttributes);
@@ -310,13 +368,21 @@ pub fn packet(attr: TokenStream, input: TokenStream) -> TokenStream {
     let name = &item.ident;
     let generics = &item.generics;
 
-    let impl_payload = get_payload_impl(&item, &origin, id);
+    let (_, ty_generics, _) = generics.split_for_impl();
+
+    let impl_payload = get_payload_impl(&item, &origin);
     let impl_origin = get_origin_impl(name, &origin, generics);
     let impl_dispatch = get_dispatch_impl(name, &origin, generics);
 
     TokenStream::from(quote! {
-        #[derive(Debug)]
+        #[derive(Serializable, Debug)]
         #item
+
+        impl<'a> #name #ty_generics {
+            pub fn id(&self) -> i32 {
+                #id
+            }
+        }
 
         #impl_payload
 
