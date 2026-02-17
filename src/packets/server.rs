@@ -75,3 +75,9 @@ pub struct Animation {
     #[from = "u8"]
     pub kind: AnimationKind,
 }
+
+#[packet(Play, 0x14, Server)]
+pub struct Entity {
+    #[format = "varint"]
+    pub entity_id: i32,
+}
