@@ -106,3 +106,9 @@ pub struct RemoveEntityEffect {
 pub struct CloseWindow {
     pub window_id: u8,
 }
+
+// TODO: Reason is a JSON
+#[packet(Play, 0x2E, Server)]
+pub struct Disconnect<'a> {
+    pub reason: Cow<'a, str>,
+}
