@@ -63,6 +63,11 @@ pub struct Respawn<'a> {
     pub level_type: Cow<'a, str>,
 }
 
+#[packet(Play, 0x09, Server)]
+pub struct HeldItemChange {
+    pub slot: u8,
+}
+
 #[packet(Play, 0x0B, Server)]
 pub struct Animation {
     #[format = "varint"]
