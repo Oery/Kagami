@@ -81,3 +81,15 @@ pub struct Entity {
     #[format = "varint"]
     pub entity_id: i32,
 }
+
+#[packet(Play, 0x1D, Server)]
+pub struct EntityEffect {
+    #[format = "varint"]
+    pub entity_id: i32,
+    #[from = "u8"]
+    pub effect: PotionEffect,
+    pub amplifier: u8,
+    #[format = "varint"]
+    pub duration: i32,
+    pub hide_particles: bool,
+}

@@ -73,3 +73,31 @@ pub enum ChatPosition {
     System,
     HotBar,
 }
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, FromRepr)]
+pub enum PotionEffect {
+    Speed = 1,
+    Slowness,
+    Haste,
+    MiningFatigue,
+    Strength,
+    InstantHealth,
+    InstantDamage,
+    JumpBoost,
+    Nausea,
+    Regeneration,
+    Resistance,
+    FireResistance,
+    WaterBreathing,
+    Invisibility,
+    Blindness,
+    NightVision,
+    Hunger,
+    Weakness,
+    Poison,
+    Wither,
+    HealthBoost,
+    Absorbtion,
+    Saturation,
+}
