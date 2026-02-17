@@ -93,3 +93,11 @@ pub struct EntityEffect {
     pub duration: Duration,
     pub hide_particles: bool,
 }
+
+#[packet(Play, 0x1E, Server)]
+pub struct RemoveEntityEffect {
+    #[format = "varint"]
+    pub entity_id: i32,
+    #[from = "u8"]
+    pub effect: PotionEffect,
+}
