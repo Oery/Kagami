@@ -48,7 +48,8 @@ pub struct JoinGame<'a> {
 #[packet(Play, 0x02, Server)]
 pub struct Chat<'a> {
     pub json: Cow<'a, str>,
-    pub position: u8,
+    #[from = "u8"]
+    pub position: ChatPosition,
 }
 
 #[packet(Play, 0x07, Server)]

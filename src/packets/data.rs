@@ -65,3 +65,11 @@ pub enum AnimationKind {
     CriticalEffect,
     MagicCriticalEffect,
 }
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, FromRepr)]
+pub enum ChatPosition {
+    Chat,
+    System,
+    HotBar,
+}

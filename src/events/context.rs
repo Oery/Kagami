@@ -1,7 +1,7 @@
 use crate::{
     context::{BufferedStream, State},
     events::{ClientPacket, ServerPacket},
-    packets::{client, server},
+    packets::{client, data::ChatPosition, server},
     varint::temp_convert,
 };
 
@@ -60,7 +60,10 @@ impl<'a, 'b> Client<'a, 'b> {
     }
 
     pub fn chat(&mut self, message: &str) {
-        self.send(&server::Chat { json: format!("'{message}'").into(), position: 0 });
+        self.send(&server::Chat {
+            json: format!("'{message}'").into(),
+            position: ChatPosition::Chat,
+        });
     }
 }
 
