@@ -50,3 +50,14 @@ pub struct Chat<'a> {
     pub json: Cow<'a, str>,
     pub position: u8,
 }
+
+#[packet(Play, 0x07, Server)]
+pub struct Respawn<'a> {
+    #[from = "i32"]
+    pub dimension: Dimension,
+    #[from = "u8"]
+    pub difficulty: Difficulty,
+    #[from = "u8"]
+    pub game_mode: GameMode,
+    pub level_type: Cow<'a, str>,
+}

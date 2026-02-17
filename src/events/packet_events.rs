@@ -12,6 +12,7 @@ type LoginSuccessEvent = Box<dyn for<'a> Fn(&mut Context<server::LoginSuccess<'a
 type ClientChatEvent = Box<dyn for<'a> Fn(&mut Context<client::Chat<'a>>) + Send + Sync + 'static>;
 type ServerChatEvent = Box<dyn for<'a> Fn(&mut Context<server::Chat<'a>>) + Send + Sync + 'static>;
 type JoinGameEvent = Box<dyn for<'a> Fn(&mut Context<server::JoinGame<'a>>) + Send + Sync + 'static>;
+type RespawnEvent = Box<dyn for<'a> Fn(&mut Context<server::Respawn<'a>>) + Send + Sync + 'static>;
 
 #[derive(Default)]
 pub struct PacketEvents {
@@ -25,4 +26,5 @@ pub struct PacketEvents {
     pub server_login_success: Vec<LoginSuccessEvent>,
     pub server_join_game: Vec<JoinGameEvent>,
     pub server_chat: Vec<ServerChatEvent>,
+    pub server_respawn: Vec<RespawnEvent>,
 }

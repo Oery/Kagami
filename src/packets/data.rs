@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
+use strum::FromRepr;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Player {
@@ -27,4 +28,29 @@ pub struct Response {
     pub players: Players,
     pub version: Version,
     pub favicon: String,
+}
+
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, FromRepr)]
+pub enum Dimension {
+    Nether = -1,
+    Overworld = 0,
+    End = 1,
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, FromRepr)]
+pub enum Difficulty {
+    Peaceful,
+    Easy,
+    Normal,
+    Hard,
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, FromRepr)]
+pub enum GameMode {
+    Survival,
+    Creative,
+    Adventure,
 }
