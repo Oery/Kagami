@@ -34,18 +34,23 @@ pub struct KeepAlive {
     pub id: i32,
 }
 
+// TODO: gamemode has a special bit for hardcore mode
+// TODO: level_type should be an enum
+// FIXME: Dimension is a byte here instead of an int
 #[packet(Play, 0x01, Server)]
 pub struct JoinGame<'a> {
     #[format = "varint"]
     pub entity_id: i32,
     pub gamemode: u8,
     pub dimension: u8,
-    pub difficulty: u8,
+    #[from = "u8"]
+    pub difficulty: Difficulty,
     pub max_players: u8,
     pub level_type: Cow<'a, str>,
-    pub reduced_debug_info: u8,
+    pub reduced_debug_info: bool,
 }
 
+// TODO: json is a JSON (obviously)
 #[packet(Play, 0x02, Server)]
 pub struct Chat<'a> {
     pub json: Cow<'a, str>,
