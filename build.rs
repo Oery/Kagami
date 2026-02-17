@@ -153,7 +153,7 @@ fn main() {
 
     let cases = packets.iter().map(get_match_case);
 
-    let handle_fn = quote::quote! {
+    let handle_fn = quote! {
         async fn handle_packet(ctx: &mut ProxyContext<'_>, packet: &Packet<'_>) -> Result<(), PacketError> {
             let state = ctx.state.mc_state.load(Ordering::Relaxed);
 
@@ -171,7 +171,7 @@ fn main() {
 
     let fields = packets.iter().map(get_event_field);
 
-    let events_struct = quote::quote! {
+    let events_struct = quote! {
         #[derive(Default)]
         pub struct PacketEvents {
                 #( #fields )*

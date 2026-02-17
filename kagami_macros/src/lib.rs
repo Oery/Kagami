@@ -130,36 +130,36 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> 
 
                 "i32" => match format {
                     Format::Standard => {
-                        quote::quote! {
+                        quote! {
                             raw_payload.write(&#field.to_le_bytes())?;
                         }
                     }
                     Format::VarInt => {
-                        quote::quote! { raw_payload.write(&crate::varint::temp_convert(#field)?)?; }
+                        quote! { raw_payload.write(&crate::varint::temp_convert(#field)?)?; }
                     }
                     _ => panic!("Unsupported format"),
                 },
 
                 "String" => match format {
-                    Format::Standard => quote::quote! {
+                    Format::Standard => quote! {
                         raw_payload.write(&crate::varint::temp_convert(#field.len() as i32)?)?;
                         raw_payload.write(#field.as_bytes())?;
                     },
                     _ => panic!("Unsupported format"),
                 },
 
-                "Cow" => quote::quote! {
+                "Cow" => quote! {
                     raw_payload.write(&crate::varint::temp_convert(#field.len() as i32)?)?;
                     raw_payload.write(#field.as_bytes())?;
                 },
 
-                "Duration" => quote::quote! {
+                "Duration" => quote! {
                     let duration = #field.as_millis() / 50;
                     raw_payload.write(&crate::varint::temp_convert(duration as i32)?)?;
                 },
 
                 _ => match format {
-                    Format::JSON => quote::quote! {
+                    Format::JSON => quote! {
                         let j = serde_json::to_string(&#field).unwrap();
                         raw_payload.write(&crate::varint::temp_convert(j.len() as i32)?)?;
                         raw_payload.write(j.as_bytes())?;
@@ -179,7 +179,7 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> 
                 None => data_ser,
             }
         }
-        _ => quote::quote! {
+        _ => quote! {
             Default::default()
         },
     }
@@ -200,32 +200,32 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
             };
 
             let data_de = match data_type.as_str() {
-                "bool" => quote::quote! {
+                "bool" => quote! {
                     nom::bytes::streaming::take(1usize)(input)?;
                     let #name = #name[0] == 1;
                 },
 
-                "u8" => quote::quote! {
+                "u8" => quote! {
                     nom::bytes::streaming::take(1usize)(input)?;
                     let #name = #name[0];
                 },
 
                 "i32" => match format {
-                    Format::Standard => quote::quote! { int(input)?; },
-                    Format::VarInt => quote::quote! { varint_i32(input)?; },
+                    Format::Standard => quote! { int(input)?; },
+                    Format::VarInt => quote! { varint_i32(input)?; },
                     _ => panic!("Unsupported format"),
                 },
 
-                "i16" => quote::quote! { short(input)?; },
+                "i16" => quote! { short(input)?; },
 
                 "String" => match format {
-                    Format::Standard => quote::quote! { string(input)?; },
+                    Format::Standard => quote! { string(input)?; },
                     _ => panic!("Unsupported format"),
                 },
 
-                "Cow" => quote::quote! { string(input)?; },
+                "Cow" => quote! { string(input)?; },
 
-                "Duration" => quote::quote! {
+                "Duration" => quote! {
                     {
                         let (input, value) = varint_i32(input)?;
                         let duration = Duration::from_millis(value as u64 * 50);
@@ -234,7 +234,7 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
                 },
 
                 _ => match format {
-                    Format::JSON => quote::quote! { json::<#ident>(input)?; },
+                    Format::JSON => quote! { json::<#ident>(input)?; },
                     _ => panic!("Type '{ident}' has no standard encoder"),
                 },
             };
@@ -251,7 +251,7 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
                 None => data_de,
             }
         }
-        _ => quote::quote! {
+        _ => quote! {
             Default::default()
         },
     }
