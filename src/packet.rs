@@ -16,6 +16,13 @@ pub struct Packet<'a> {
     pub raw_payload: Cow<'a, [u8]>,
 }
 
+pub fn int(input: &[u8]) -> IResult<&[u8], i32> {
+    let (input, bytes) = take(4 as usize)(input)?;
+    let val = i32::from_le_bytes(bytes.try_into().unwrap());
+
+    Ok((input, val))
+}
+
 pub fn varint_i32(mut input: &[u8]) -> IResult<&[u8], i32> {
     let mut val: i32 = 0;
     let mut pos = 0;

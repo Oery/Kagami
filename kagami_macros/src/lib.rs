@@ -96,6 +96,11 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenStre
                 },
 
                 "i32" => match format {
+                    Format::Standard => {
+                        quote::quote! {
+                            raw_payload.write(&self.#name.to_le_bytes())?;
+                        }
+                    }
                     Format::VarInt => {
                         quote::quote! { raw_payload.write(&crate::varint::temp_convert(self.#name)?)?; }
                     }
@@ -151,6 +156,7 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenSt
                 },
 
                 "i32" => match format {
+                    Format::Standard => quote::quote! { int(input)?; },
                     Format::VarInt => quote::quote! { varint_i32(input)?; },
                     _ => panic!("Unsupported format"),
                 },
