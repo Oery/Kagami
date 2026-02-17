@@ -1,4 +1,9 @@
-use crate::{events::*, proxy::Payload};
+use crate::events::Context;
+use crate::packets::*;
+use crate::proxy::Payload;
+
+// Struct holding all events
+include!(concat!(env!("OUT_DIR"), "/packet_events.rs"));
 
 #[derive(Default)]
 pub struct EventManager {

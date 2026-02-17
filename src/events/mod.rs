@@ -4,9 +4,6 @@ pub use context::*;
 mod manager;
 pub use manager::*;
 
-mod packet_events;
-pub use packet_events::*;
-
 use crate::proxy::Payload;
 
 pub trait ServerPacket<'a>: Payload<'a> {}

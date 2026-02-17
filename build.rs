@@ -39,6 +39,22 @@ impl ToTokens for State {
     }
 }
 
+fn to_snake_case(s: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in s.chars().enumerate() {
+        match c.is_uppercase() {
+            true => {
+                if i != 0 {
+                    out.push('_');
+                }
+                out.push(c.to_ascii_lowercase());
+            }
+            false => out.push(c),
+        };
+    }
+    out
+}
+
 struct PacketAttributes {
     state: State,
     id: i32,
@@ -101,6 +117,29 @@ fn get_match_case(packet: &ItemStruct) -> TokenStream {
     }
 }
 
+fn get_event_field(packet: &ItemStruct) -> TokenStream {
+    let name = &packet.ident;
+
+    let PacketAttributes { id: _, state: _, origin } = packet.attrs[0]
+        .parse_args::<PacketAttributes>()
+        .expect("invalid attribute");
+
+    let src = match origin {
+        Origin::Client => quote! { client },
+        Origin::Server => quote! { server },
+    };
+
+    let (_, ty_generics, _) = &packet.generics.split_for_impl();
+
+    let snake_name = to_snake_case(name.to_string().as_str());
+    let field_name = format!("{src}_{snake_name}");
+    let field_ident = syn::Ident::new(&field_name, name.span());
+
+    quote! {
+        pub #field_ident: Vec<Box<dyn for<'a> Fn(&mut Context<#src::#name #ty_generics>) + Send + Sync + 'static>>,
+    }
+}
+
 fn main() {
     println!("cargo::rerun-if-changed=src/packets/client.rs");
     println!("cargo::rerun-if-changed=src/packets/server.rs");
@@ -128,5 +167,19 @@ fn main() {
     fs::File::create(Path::new(&out_dir).join("handle_packet.rs"))
         .unwrap()
         .write_all(handle_fn.to_string().as_bytes())
+        .unwrap();
+
+    let fields = packets.iter().map(get_event_field);
+
+    let events_struct = quote::quote! {
+        #[derive(Default)]
+        pub struct PacketEvents {
+                #( #fields )*
+        }
+    };
+
+    fs::File::create(Path::new(&out_dir).join("packet_events.rs"))
+        .unwrap()
+        .write_all(events_struct.to_string().as_bytes())
         .unwrap();
 }
