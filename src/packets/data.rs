@@ -1,11 +1,18 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-// TODO: Add player sample
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Player {
+    pub id: String,
+    pub name: String,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Players {
     pub max: i32,
     pub online: i32,
+    #[serde(default)]
+    pub sample: Vec<Player>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
