@@ -54,3 +54,14 @@ pub enum GameMode {
     Creative,
     Adventure,
 }
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, FromRepr)]
+pub enum AnimationKind {
+    SwingArm,
+    TakeDamage,
+    LeaveBed,
+    EatFood,
+    CriticalEffect,
+    MagicCriticalEffect,
+}

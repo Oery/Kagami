@@ -27,4 +27,5 @@ pub struct PacketEvents {
     pub server_join_game: Vec<JoinGameEvent>,
     pub server_chat: Vec<ServerChatEvent>,
     pub server_respawn: Vec<RespawnEvent>,
+    pub server_animation: Vec<PacketEvent<server::Animation>>,
 }

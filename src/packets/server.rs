@@ -61,3 +61,11 @@ pub struct Respawn<'a> {
     pub game_mode: GameMode,
     pub level_type: Cow<'a, str>,
 }
+
+#[packet(Play, 0x0B, Server)]
+pub struct Animation {
+    #[format = "varint"]
+    pub entity_id: i32,
+    #[from = "u8"]
+    pub kind: AnimationKind,
+}
