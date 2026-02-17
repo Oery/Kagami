@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{Data, DeriveInput, Field, Fields, Generics, Type, parse_macro_input};
@@ -77,7 +77,26 @@ fn get_format(field: &Field) -> Format {
     return Format::Standard;
 }
 
-fn get_ser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenStream {
+fn get_from(field: &Field) -> Option<String> {
+    if let Some(mnv) = field.attrs.iter().find_map(|attr| match &attr.meta {
+        syn::Meta::NameValue(mnv) if mnv.path.is_ident("from") => Some(mnv),
+        _ => None,
+    }) {
+        let syn::Expr::Lit(lit) = &mnv.value else {
+            return None;
+        };
+
+        let syn::Lit::Str(src) = &lit.lit else {
+            return None;
+        };
+
+        return Some(src.value());
+    };
+
+    None
+}
+
+fn get_ser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> proc_macro2::TokenStream {
     match ty {
         Type::Path(type_path) => {
             let path = &type_path.path;
@@ -86,52 +105,73 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenStre
             let segment = path.segments.last().unwrap();
             let ident = &segment.ident;
 
-            match ident.to_string().as_str() {
+            let data_type = match from {
+                Some(ref data_type) => data_type.to_owned(),
+                None => ident.to_string(),
+            };
+
+            let field = match from {
+                Some(_) => quote! { value },
+                None => quote! { self.#name },
+            };
+
+            let data_ser = match data_type.as_str() {
                 "u8" => quote::quote! {
-                    raw_payload.write(&[self.#name])?;
+                    raw_payload.write(&[#field])?;
                 },
 
                 "i16" => quote::quote! {
-                    raw_payload.write(&self.#name.to_be_bytes())?;
+                    raw_payload.write(&#field.to_be_bytes())?;
                 },
 
                 "i32" => match format {
                     Format::Standard => {
                         quote::quote! {
-                            raw_payload.write(&self.#name.to_le_bytes())?;
+                            raw_payload.write(&#field.to_le_bytes())?;
                         }
                     }
                     Format::VarInt => {
-                        quote::quote! { raw_payload.write(&crate::varint::temp_convert(self.#name)?)?; }
+                        quote::quote! { raw_payload.write(&crate::varint::temp_convert(#field)?)?; }
                     }
                     _ => panic!("Unsupported format"),
                 },
 
                 "String" => match format {
                     Format::Standard => quote::quote! {
-                        raw_payload.write(&crate::varint::temp_convert(self.#name.len() as i32)?)?;
-                        raw_payload.write(self.#name.as_bytes())?;
+                        raw_payload.write(&crate::varint::temp_convert(#field.len() as i32)?)?;
+                        raw_payload.write(#field.as_bytes())?;
                     },
                     _ => panic!("Unsupported format"),
                 },
 
                 "Cow" => quote::quote! {
-                    raw_payload.write(&crate::varint::temp_convert(self.#name.len() as i32)?)?;
-                    raw_payload.write(self.#name.as_bytes())?;
+                    raw_payload.write(&crate::varint::temp_convert(#field.len() as i32)?)?;
+                    raw_payload.write(#field.as_bytes())?;
                 },
 
                 "McState" => quote::quote! {
-                    raw_payload.write(&crate::varint::temp_convert(self.#name as i32)?)?;
+                    raw_payload.write(&crate::varint::temp_convert(#field as i32)?)?;
                 },
 
                 _ => match format {
                     Format::JSON => quote::quote! {
-                        let j = serde_json::to_string(&self.#name).unwrap();
+                        let j = serde_json::to_string(&#field).unwrap();
                         raw_payload.write(&crate::varint::temp_convert(j.len() as i32)?)?;
                         raw_payload.write(j.as_bytes())?;
                     },
                     _ => panic!("Type '{ident}' has no standard encoder"),
                 },
+            };
+
+            match from {
+                Some(_) => {
+                    let ty_ident = Ident::new(&data_type, Span::call_site());
+                    quote! {
+                        let value = self.#name as #ty_ident;
+                        #data_ser
+                    }
+                }
+                None => data_ser,
             }
         }
         _ => quote::quote! {
@@ -140,7 +180,7 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenStre
     }
 }
 
-fn get_deser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenStream {
+fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> proc_macro2::TokenStream {
     match ty {
         Type::Path(type_path) => {
             let path = &type_path.path;
@@ -149,7 +189,12 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenSt
             let segment = path.segments.last().unwrap();
             let ident = &segment.ident;
 
-            match ident.to_string().as_str() {
+            let data_type = match from {
+                Some(ref data_type) => data_type.to_owned(),
+                None => ident.to_string(),
+            };
+
+            let data_de = match data_type.as_str() {
                 "u8" => quote::quote! {
                     nom::bytes::streaming::take(1usize)(input)?;
                     let #name = #name[0];
@@ -176,6 +221,18 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format) -> proc_macro2::TokenSt
                     Format::JSON => quote::quote! { json::<#ident>(input)?; },
                     _ => panic!("Type '{ident}' has no standard encoder"),
                 },
+            };
+
+            match from {
+                Some(_) => {
+                    quote! {
+                        {
+                            let (input, #name) = #data_de
+                            (input, #ident::from_repr(#name).unwrap())
+                        };
+                    }
+                }
+                None => data_de,
             }
         }
         _ => quote::quote! {
@@ -329,7 +386,7 @@ fn get_origin_impl(name: &Ident, origin: &Origin, generics: &Generics) -> proc_m
     }
 }
 
-#[proc_macro_derive(Serializable, attributes(format))]
+#[proc_macro_derive(Serializable, attributes(format, from))]
 pub fn serializable(input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as DeriveInput);
     let name = &item.ident;
@@ -347,7 +404,8 @@ pub fn serializable(input: TokenStream) -> TokenStream {
     let field_desers = fields.named.iter().map(|field| {
         let name = field.ident.as_ref().unwrap();
         let format = get_format(field);
-        let deser_fn = get_deser_fn(&field.ty, name, format);
+        let from = get_from(field);
+        let deser_fn = get_deser_fn(&field.ty, name, format, from);
 
         quote! {
             let (input, #name) = #deser_fn
@@ -357,7 +415,8 @@ pub fn serializable(input: TokenStream) -> TokenStream {
     let field_sers = fields.named.iter().map(|field| {
         let name = field.ident.as_ref().unwrap();
         let format = get_format(field);
-        get_ser_fn(&field.ty, name, format)
+        let from = get_from(field);
+        get_ser_fn(&field.ty, name, format, from)
     });
 
     let field_names = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
