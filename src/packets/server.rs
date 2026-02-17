@@ -101,3 +101,8 @@ pub struct RemoveEntityEffect {
     #[from = "u8"]
     pub effect: PotionEffect,
 }
+
+#[packet(Play, 0x2E, Server)]
+pub struct CloseWindow {
+    pub window_id: u8,
+}
