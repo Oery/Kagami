@@ -153,6 +153,11 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> 
                     raw_payload.write(#field.as_bytes())?;
                 },
 
+                "Duration" => quote::quote! {
+                    let duration = #field.as_millis() / 50;
+                    raw_payload.write(&crate::varint::temp_convert(duration as i32)?)?;
+                },
+
                 "McState" => quote::quote! {
                     raw_payload.write(&crate::varint::temp_convert(#field as i32)?)?;
                 },
@@ -223,6 +228,14 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
                 },
 
                 "Cow" => quote::quote! { string(input)?; },
+
+                "Duration" => quote::quote! {
+                    {
+                        let (input, value) = varint_i32(input)?;
+                        let duration = Duration::from_millis(value as u64 * 50);
+                        (input, duration)
+                    };
+                },
 
                 "McState" => quote::quote! { state(input)?; },
 

@@ -3,6 +3,7 @@ use kagami_macros::packet;
 
 use std::borrow::Cow;
 use std::io::Write;
+use std::time::Duration;
 
 use crate::events::*;
 use crate::packet::*;
@@ -89,7 +90,6 @@ pub struct EntityEffect {
     #[from = "u8"]
     pub effect: PotionEffect,
     pub amplifier: u8,
-    #[format = "varint"]
-    pub duration: i32,
+    pub duration: Duration,
     pub hide_particles: bool,
 }
