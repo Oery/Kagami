@@ -44,15 +44,6 @@ pub fn varint_i32(mut input: &[u8]) -> IResult<&[u8], i32> {
     }
 }
 
-pub fn state(input: &[u8]) -> IResult<&[u8], McState> {
-    let (input, discriminant) = varint_i32(input)?;
-
-    match McState::from_repr(discriminant) {
-        Some(val) => Ok((input, val)),
-        None => Err(nom::Err::Error(Error { input, code: ErrorKind::Digit })),
-    }
-}
-
 pub fn short(input: &[u8]) -> IResult<&[u8], i16> {
     let (input, bytes) = take(2usize)(input)?;
     let val = i16::from_be_bytes(bytes.try_into().unwrap());

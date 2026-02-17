@@ -14,6 +14,8 @@ pub struct Handshake<'a> {
     pub protocol_version: i32,
     pub addr: Cow<'a, str>,
     pub port: i16,
+    #[format = "varint"]
+    #[from = "i32"]
     pub next_state: McState,
 }
 

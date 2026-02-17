@@ -158,10 +158,6 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> 
                     raw_payload.write(&crate::varint::temp_convert(duration as i32)?)?;
                 },
 
-                "McState" => quote::quote! {
-                    raw_payload.write(&crate::varint::temp_convert(#field as i32)?)?;
-                },
-
                 _ => match format {
                     Format::JSON => quote::quote! {
                         let j = serde_json::to_string(&#field).unwrap();
@@ -236,8 +232,6 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
                         (input, duration)
                     };
                 },
-
-                "McState" => quote::quote! { state(input)?; },
 
                 _ => match format {
                     Format::JSON => quote::quote! { json::<#ident>(input)?; },
