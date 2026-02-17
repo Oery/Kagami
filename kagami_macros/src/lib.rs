@@ -116,6 +116,10 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> 
             };
 
             let data_ser = match data_type.as_str() {
+                "bool" => quote::quote! {
+                    raw_payload.write(&[#field as u8])?;
+                },
+
                 "u8" => quote::quote! {
                     raw_payload.write(&[#field])?;
                 },
@@ -195,6 +199,11 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
             };
 
             let data_de = match data_type.as_str() {
+                "bool" => quote::quote! {
+                    nom::bytes::streaming::take(1usize)(input)?;
+                    let #name = #name[0] == 1;
+                },
+
                 "u8" => quote::quote! {
                     nom::bytes::streaming::take(1usize)(input)?;
                     let #name = #name[0];
