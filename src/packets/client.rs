@@ -52,3 +52,12 @@ pub struct KeepAlive {
     #[format = "varint"]
     pub id: i32,
 }
+
+#[packet(Play, 0x0B, Client)]
+pub struct EntityAction {
+    #[format = "varint"]
+    pub entity_id: i32,
+    pub action: ActionKind,
+    #[format = "varint"]
+    pub boost: i32,
+}

@@ -187,38 +187,14 @@ impl Serializable<'_> for Position {
     }
 }
 
-// #[derive(Debug, Serializable)]
-// pub enum ActionKind {
-//     StartSneaking,
-//     StopSneaking,
-//     LeaveBed,
-//     StartSprinting,
-//     StopSprinting,
-//     JumpWithHorse {
-//         #[format = "varint"]
-//         boost: i32,
-//     },
-//     OpenRiddenHorseInventory,
-// }
-//
-// impl ActionKind {
-//     pub fn deserialize(input: &[u8]) -> IResult<&[u8], ActionKind> {
-//         let (input, val) = varint_i32(input)?;
-//
-//         let (input, action) = match val {
-//             0 => (input, ActionKind::StartSneaking),
-//             1 => (input, ActionKind::StopSneaking),
-//             2 => (input, ActionKind::LeaveBed),
-//             3 => (input, ActionKind::StartSprinting),
-//             4 => (input, ActionKind::StopSprinting),
-//             5 => {
-//                 let (input, val) = varint_i32(input)?;
-//                 (input, ActionKind::JumpWithHorse { boost: val })
-//             }
-//             6 => (input, ActionKind::OpenRiddenHorseInventory),
-//             _ => return Err(nom::Err::Failure(Error::new(input, ErrorKind::Fail))),
-//         };
-//
-//         Ok((input, action))
-//     }
-// }
+#[derive(Debug, Serializable)]
+#[my_repr(i32)]
+pub enum ActionKind {
+    StartSneaking,
+    StopSneaking,
+    LeaveBed,
+    StartSprinting,
+    StopSprinting,
+    JumpWithHorse,
+    OpenRiddenHorseInventory,
+}
