@@ -153,26 +153,13 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> 
                     raw_payload.write(#field.as_bytes())?;
                 },
 
-                "Duration" => quote! {
-                    let duration = #field.as_millis() / 50;
-                    raw_payload.write(&crate::varint::temp_convert(duration as i32)?)?;
-                },
-
-                "Position" => quote! {
-                    let val = ((#field.x as u64 & 0x3FFFFFF) << 38)
-                        | ((#field.y as u64 & 0xFFF) << 26)
-                        | (#field.z as u64 & 0x3FFFFFF);
-
-                    raw_payload.write(&val.to_be_bytes())?;
-                },
-
                 _ => match format {
                     Format::JSON => quote! {
                         let j = serde_json::to_string(&#field).unwrap();
                         raw_payload.write(&crate::varint::temp_convert(j.len() as i32)?)?;
                         raw_payload.write(j.as_bytes())?;
                     },
-                    _ => panic!("Type '{ident}' has no standard encoder"),
+                    _ => quote! { #field.serialize(&mut raw_payload)?; },
                 },
             };
 
@@ -233,19 +220,14 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
 
                 "Cow" => quote! { string(input)?; },
 
-                "Duration" => quote! {
-                    {
-                        let (input, value) = varint_i32(input)?;
-                        let duration = Duration::from_millis(value as u64 * 50);
-                        (input, duration)
-                    };
-                },
-
-                "Position" => quote! { position(input)?; },
-
                 _ => match format {
                     Format::JSON => quote! { json::<#ident>(input)?; },
-                    _ => panic!("Type '{ident}' has no standard encoder"),
+                    _ => quote! {
+                        {
+                            let (input, value) = #path ::deserialize(input)?;
+                            (input, value)
+                        };
+                    },
                 },
             };
 
