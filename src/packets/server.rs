@@ -9,13 +9,14 @@ use std::time::Duration;
 use crate::events::*;
 use crate::packet::*;
 use crate::packets::data::*;
+use crate::packets::json::*;
 
 // TODO: Check if response can be zero copied
-// #[packet(Status, 0x00, Server)]
-// pub struct StatusResponse {
-//     #[format = "json"]
-//     pub response: Response,
-// }
+#[packet(Status, 0x00, Server)]
+pub struct StatusResponse {
+    #[format = "json"]
+    pub response: Response,
+}
 
 #[packet(Login, 0x02, Server)]
 pub struct LoginSuccess<'a> {
@@ -127,6 +128,5 @@ pub struct Disconnect<'a> {
 #[packet(Play, 0x42, Server)]
 pub struct CombatEvent<'a> {
     #[format = "varint"]
-    // #[from = "i32"]
     pub event: EventKind<'a>,
 }
