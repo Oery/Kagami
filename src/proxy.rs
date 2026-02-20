@@ -2,6 +2,7 @@ use crate::context::{ProxyContext, Source};
 use crate::error::{KResult, PResult, PacketError};
 use crate::events::{Context, EventManager};
 use crate::packet::{Packet, packet};
+use crate::packets::data::Serializable;
 use crate::packets::{client, client::*, server, server::*};
 use crate::state::McState;
 use crate::varint::temp_convert;
@@ -30,9 +31,9 @@ use std::fmt::Debug;
 
 include!(concat!(env!("OUT_DIR"), "/handle_packet.rs"));
 
-pub trait SerializablePacket<'a>: Sized {
-    fn deserialize(raw_payload: &'a [u8]) -> PResult<Self>;
-    fn serialize(&self) -> PResult<Packet<'_>>;
+pub trait SerializablePacket<'a>: Sized + Serializable<'a> {
+    fn deserialize_packet(raw_payload: &'a [u8]) -> PResult<Self>;
+    fn serialize_packet(&self) -> PResult<Packet<'_>>;
 }
 
 pub trait Payload<'a>: Debug + Sized + SerializablePacket<'a> {
@@ -62,10 +63,10 @@ async fn handle_payload<'a, T: Dispatch<'a>>(
         return Ok(());
     }
 
-    let payload = T::deserialize(&packet.raw_payload)?;
+    let payload = T::deserialize_packet(&packet.raw_payload)?;
 
     if let Some(payload) = payload.dispatch(ctx) {
-        let packet = payload.serialize()?;
+        let packet = payload.serialize_packet()?;
         write_packet(ctx, &packet).await?;
     }
 
