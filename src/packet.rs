@@ -8,6 +8,7 @@ use nom::bytes::streaming::take;
 use nom::error::{Error, ErrorKind};
 use serde::de::DeserializeOwned;
 
+use crate::packets::data::*;
 use crate::state::McState;
 
 #[derive(Debug, Default)]
@@ -140,6 +141,28 @@ pub fn i32_to_varint(mut value: i32) -> Vec<u8> {
     }
 
     result
+}
+
+pub fn position(input: &[u8]) -> IResult<&[u8], Position> {
+    let (input, bytes) = take(8 as usize)(input)?;
+    let val: u64 = u64::from_be_bytes(bytes.try_into().unwrap());
+
+    let mut x = (val >> 38) as i32;
+    let mut y = ((val >> 26) & 0xFFF) as i16;
+    let mut z = (val & 0x3FFFFFF) as i32;
+
+    // Apply sign correction
+    if x >= 1 << 25 {
+        x -= 1 << 26;
+    }
+    if y >= 1 << 11 {
+        y -= 1 << 12;
+    }
+    if z >= 1 << 25 {
+        z -= 1 << 26;
+    }
+
+    Ok((input, Position { x, y, z }))
 }
 
 #[cfg(test)]

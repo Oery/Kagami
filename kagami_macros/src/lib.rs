@@ -158,6 +158,14 @@ fn get_ser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -> 
                     raw_payload.write(&crate::varint::temp_convert(duration as i32)?)?;
                 },
 
+                "Position" => quote! {
+                    let val = ((#field.x as u64 & 0x3FFFFFF) << 38)
+                        | ((#field.y as u64 & 0xFFF) << 26)
+                        | (#field.z as u64 & 0x3FFFFFF);
+
+                    raw_payload.write(&val.to_be_bytes())?;
+                },
+
                 _ => match format {
                     Format::JSON => quote! {
                         let j = serde_json::to_string(&#field).unwrap();
@@ -232,6 +240,8 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
                         (input, duration)
                     };
                 },
+
+                "Position" => quote! { position(input)?; },
 
                 _ => match format {
                     Format::JSON => quote! { json::<#ident>(input)?; },
