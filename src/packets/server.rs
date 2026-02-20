@@ -118,7 +118,7 @@ pub struct CloseWindow {
 }
 
 // TODO: Reason is a JSON
-#[packet(Play, 0x2E, Server)]
+#[packet(Play, 0x40, Server)]
 pub struct Disconnect<'a> {
     pub reason: Cow<'a, str>,
 }
