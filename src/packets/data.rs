@@ -98,6 +98,6 @@ pub enum PotionEffect {
     Poison,
     Wither,
     HealthBoost,
-    Absorbtion,
+    Absorption,
     Saturation,
 }
