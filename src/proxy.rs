@@ -1,10 +1,10 @@
 use crate::context::{ProxyContext, Source};
 use crate::error::{KResult, PResult, PacketError};
-use crate::events::{Context, EventManager};
+use crate::events::EventManager;
 use crate::packet::{Packet, packet};
-use crate::packets::data::Serializable;
 use crate::packets::{client, client::*, server, server::*};
 use crate::state::McState;
+use crate::traits::{Dispatch, Payload, SerializablePacket};
 use crate::varint::temp_convert;
 
 use std::io::Write;
@@ -24,32 +24,10 @@ const HOST: &str = "127.0.0.1:25565";
 const PROXY: &str = "127.0.0.1:25566";
 const BUFFER_SIZE: usize = 10_000_000; // TODO: Measure what is needed
 
-use std::fmt::Debug;
-
 // TODO: Unstable
 // -- Check unstable associated type defaults feature flag
 
 include!(concat!(env!("OUT_DIR"), "/handle_packet.rs"));
-
-pub trait SerializablePacket<'a>: Sized + Serializable<'a> {
-    fn deserialize_packet(raw_payload: &'a [u8]) -> PResult<Self>;
-    fn serialize_packet(&self) -> PResult<Packet<'_>>;
-}
-
-pub trait Payload<'a>: Debug + Sized + SerializablePacket<'a> {
-    type Item<'b>: 'b;
-    type Handler;
-
-    fn has_events(em: &EventManager) -> bool;
-    fn register(
-        em: &mut EventManager,
-        f: Box<dyn for<'b> Fn(&mut Context<Self::Item<'b>>) + Send + Sync + 'static>,
-    );
-}
-
-pub trait Dispatch<'a>: Sized + Payload<'a> + SerializablePacket<'a> {
-    fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self>;
-}
 
 // TODO: Use a RingBuffer
 // -- This would remove the need of copying bytes in an acc buffer

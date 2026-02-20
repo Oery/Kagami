@@ -10,6 +10,7 @@ use crate::events::*;
 use crate::packet::*;
 use crate::packets::data::*;
 use crate::packets::json::*;
+use crate::traits::*;
 
 // TODO: Check if response can be zero copied
 #[packet(Status, 0x00, Server)]

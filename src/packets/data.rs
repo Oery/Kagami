@@ -6,12 +6,11 @@ use std::time::Duration;
 
 use nom::IResult;
 use nom::bytes::streaming::take;
-// use serde::Deserialize;
-// use serde::Serialize;
 use strum::FromRepr;
 
 use crate::error::PResult;
 use crate::packet::*;
+use crate::traits::Serializable;
 
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, FromRepr)]
@@ -108,11 +107,6 @@ pub struct Position {
     pub z: i32,
 }
 
-pub trait Serializable<'a>: Sized {
-    fn serialize(&'a self, payload: &'a mut Vec<u8>) -> PResult<()>;
-    fn deserialize(input: &'a [u8]) -> IResult<&'a [u8], Self>;
-}
-
 impl Serializable<'_> for Duration {
     fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()> {
         let duration = self.as_millis() / 50;
@@ -169,4 +163,12 @@ pub enum ActionKind {
     StopSprinting,
     JumpWithHorse,
     OpenRiddenHorseInventory,
+}
+
+#[derive(Debug, Serializable)]
+#[my_repr(i32)]
+pub enum InteractionKind {
+    Interact,
+    Attack,
+    InteractAt { x: f32, y: f32, z: f32 },
 }

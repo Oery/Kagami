@@ -350,7 +350,7 @@ fn get_payload_impl(item: &DeriveInput, origin: &Origin) -> proc_macro2::TokenSt
     };
 
     quote! {
-        impl<'a> crate::proxy::Payload<'a> for #name #ty_generics {
+        impl<'a> Payload<'a> for #name #ty_generics {
             type Item<'b> = #item_type;
             type Handler = Box<dyn for<'b> Fn(&mut Context<#item_type>) + Send + Sync + 'static>;
 
@@ -378,7 +378,7 @@ fn get_dispatch_impl(name: &Ident, origin: &Origin, generics: &Generics) -> proc
     };
 
     quote! {
-        impl<'a> crate::proxy::Dispatch<'a> for #name #ty_generics {
+        impl<'a> Dispatch<'a> for #name #ty_generics {
             fn dispatch(self, ctx: &mut crate::context::ProxyContext) -> Option<Self> {
                 let mut pctx = #new_pctx;
 
@@ -454,7 +454,7 @@ pub fn serializable(input: TokenStream) -> TokenStream {
     let (_, ty_generics, _) = &item.generics.split_for_impl();
 
     TokenStream::from(quote! {
-        impl<'a> crate::proxy::SerializablePacket<'a> for #name #ty_generics {
+        impl<'a> SerializablePacket<'a> for #name #ty_generics {
             fn serialize_packet(&self) -> crate::error::PResult<Packet<'_>> {
                 let mut raw_payload = vec![];
                 self.serialize(&mut raw_payload)?;
