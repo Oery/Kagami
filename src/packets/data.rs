@@ -8,6 +8,7 @@ use serde::Serialize;
 use strum::FromRepr;
 
 use crate::error::PResult;
+use crate::packet::*;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Player {
