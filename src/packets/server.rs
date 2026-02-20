@@ -58,6 +58,11 @@ pub struct Chat<'a> {
     pub position: ChatPosition,
 }
 
+#[packet(Play, 0x05, Server)]
+pub struct SpawnPosition {
+    pub location: Position,
+}
+
 #[packet(Play, 0x07, Server)]
 pub struct Respawn<'a> {
     #[from = "i32"]
