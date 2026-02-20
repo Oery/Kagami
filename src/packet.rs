@@ -51,6 +51,13 @@ pub fn short(input: &[u8]) -> IResult<&[u8], i16> {
     Ok((input, val))
 }
 
+pub fn float(input: &[u8]) -> IResult<&[u8], f32> {
+    let (input, bytes) = take(4usize)(input)?;
+    let val = f32::from_be_bytes(bytes.try_into().unwrap());
+
+    Ok((input, val))
+}
+
 pub fn string(input: &[u8]) -> IResult<&[u8], Cow<'_, str>> {
     let (input, length) = varint_i32(input)?;
     let (input, content) = take(length as usize)(input)?;

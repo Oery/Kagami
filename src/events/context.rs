@@ -43,7 +43,7 @@ pub struct Client<'a, 'b>(&'b mut BufferedStream<'a>);
 
 impl<'a, 'b> Client<'a, 'b> {
     pub fn send<P: ServerPacket<'a>>(&mut self, packet: &P) {
-        let packet = packet.serialize().unwrap();
+        let packet = packet.serialize_packet().unwrap();
         let packet_id = temp_convert(packet.id).unwrap();
         let packet_len = packet.raw_payload.len() + packet_id.len();
 
@@ -71,7 +71,7 @@ pub struct Server<'a, 'b>(&'b mut BufferedStream<'a>);
 
 impl<'a, 'b> Server<'a, 'b> {
     pub fn send<P: ClientPacket<'a>>(&mut self, packet: &P) {
-        let packet = packet.serialize().unwrap();
+        let packet = packet.serialize_packet().unwrap();
         let packet_id = temp_convert(packet.id).unwrap();
         let packet_len = packet.raw_payload.len() + packet_id.len();
 

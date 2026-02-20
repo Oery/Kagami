@@ -1,3 +1,4 @@
+use kagami_macros::Serializable;
 use kagami_macros::SerializablePacket;
 use kagami_macros::packet;
 
@@ -6,6 +7,7 @@ use std::io::Write;
 
 use crate::events::*;
 use crate::packet::*;
+use crate::packets::data::*;
 use crate::state::*;
 
 #[packet(Handshake, 0x00, Client)]
@@ -27,6 +29,22 @@ pub struct LegacyPing {
 #[packet(Play, 0x01, Client)]
 pub struct Chat<'a> {
     pub message: Cow<'a, str>,
+}
+
+#[derive(Debug, Serializable)]
+#[my_repr(i32)]
+pub enum InteractionKind {
+    Interact,
+    Attack,
+    InteractAt { x: f32, y: f32, z: f32 },
+}
+
+#[packet(Play, 0x02, Client)]
+pub struct UseEntity {
+    #[format = "varint"]
+    pub target: i32,
+    // #[format = "varint"]
+    pub kind: InteractionKind,
 }
 
 #[packet(Play, 0x05, Client)]
