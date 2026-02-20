@@ -224,7 +224,7 @@ fn get_deser_fn(ty: &Type, name: &Ident, format: Format, from: Option<String>) -
                     Format::JSON => quote! { json::<#ident>(input)?; },
                     _ => quote! {
                         {
-                            let (input, value) = #path ::deserialize(input)?;
+                            let (input, value) = #ident::deserialize(input)?;
                             (input, value)
                         };
                     },
