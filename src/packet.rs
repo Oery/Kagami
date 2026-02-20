@@ -9,7 +9,6 @@ use nom::error::{Error, ErrorKind};
 use serde::de::DeserializeOwned;
 
 use crate::packets::data::*;
-use crate::state::McState;
 
 #[derive(Debug, Default)]
 pub struct Packet<'a> {
