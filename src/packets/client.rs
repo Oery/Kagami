@@ -1,4 +1,4 @@
-use kagami_macros::Serializable;
+use kagami_macros::SerializablePacket;
 use kagami_macros::packet;
 
 use std::borrow::Cow;

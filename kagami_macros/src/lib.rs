@@ -394,7 +394,7 @@ fn get_origin_impl(name: &Ident, origin: &Origin, generics: &Generics) -> proc_m
     }
 }
 
-#[proc_macro_derive(Serializable, attributes(format, from))]
+#[proc_macro_derive(SerializablePacket, attributes(format, from))]
 pub fn serializable(input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as DeriveInput);
     let name = &item.ident;
@@ -414,10 +414,7 @@ pub fn serializable(input: TokenStream) -> TokenStream {
         let format = get_format(field);
         let from = get_from(field);
         let deser_fn = get_deser_fn(&field.ty, name, format, from);
-
-        quote! {
-            let (input, #name) = #deser_fn
-        }
+        quote! { let (input, #name) = #deser_fn }
     });
 
     let field_sers = fields.named.iter().map(|field| {
@@ -429,24 +426,21 @@ pub fn serializable(input: TokenStream) -> TokenStream {
 
     let field_names = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
 
-    let deserializer = quote! {
-        fn deserialize(input: &'a [u8]) -> crate::error::PResult<Self> {
-            #( #field_desers )*
-
-            Ok(Self { #( #field_names ),* })
-        }
-    };
-
     TokenStream::from(quote! {
-        impl<'a> crate::proxy::Serializable<'a> for #name #ty_generics {
-            #deserializer
-
+        impl<'a> crate::proxy::SerializablePacket<'a> for #name #ty_generics {
             fn serialize(&self) -> crate::error::PResult<Packet<'_>> {
                 let mut raw_payload = vec![];
                 #( #field_sers )*
                 let raw_payload: Cow<'_, [u8]> = raw_payload.into();
 
                 Ok(Packet { id: self.id(), raw_payload })
+            }
+
+
+            fn deserialize(input: &'a [u8]) -> crate::error::PResult<Self> {
+                #( #field_desers )*
+
+                Ok(Self { #( #field_names ),* })
             }
         }
     })
@@ -467,7 +461,7 @@ pub fn packet(attr: TokenStream, input: TokenStream) -> TokenStream {
     let impl_dispatch = get_dispatch_impl(name, &origin, generics);
 
     TokenStream::from(quote! {
-        #[derive(Serializable, Debug)]
+        #[derive(SerializablePacket, Debug)]
         #item
 
         impl<'a> #name #ty_generics {

@@ -30,12 +30,12 @@ use std::fmt::Debug;
 
 include!(concat!(env!("OUT_DIR"), "/handle_packet.rs"));
 
-pub trait Serializable<'a>: Sized {
+pub trait SerializablePacket<'a>: Sized {
     fn deserialize(raw_payload: &'a [u8]) -> PResult<Self>;
     fn serialize(&self) -> PResult<Packet<'_>>;
 }
 
-pub trait Payload<'a>: Debug + Sized + Serializable<'a> {
+pub trait Payload<'a>: Debug + Sized + SerializablePacket<'a> {
     type Item<'b>: 'b;
     type Handler;
 
@@ -46,7 +46,7 @@ pub trait Payload<'a>: Debug + Sized + Serializable<'a> {
     );
 }
 
-pub trait Dispatch<'a>: Sized + Payload<'a> + Serializable<'a> {
+pub trait Dispatch<'a>: Sized + Payload<'a> + SerializablePacket<'a> {
     fn dispatch(self, ctx: &mut ProxyContext) -> Option<Self>;
 }
 

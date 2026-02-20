@@ -117,12 +117,12 @@ pub struct Position {
     pub z: i32,
 }
 
-pub trait SerializableData: Sized {
+pub trait Serializable: Sized {
     fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()>;
     fn deserialize(input: &[u8]) -> IResult<&[u8], Self>;
 }
 
-impl SerializableData for Duration {
+impl Serializable for Duration {
     fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()> {
         let duration = self.as_millis() / 50;
         payload.write(&crate::varint::temp_convert(duration as i32)?)?;
@@ -136,7 +136,7 @@ impl SerializableData for Duration {
     }
 }
 
-impl SerializableData for Position {
+impl Serializable for Position {
     fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()> {
         let val = ((self.x as u64 & 0x3FFFFFF) << 38)
             | ((self.y as u64 & 0xFFF) << 26)
