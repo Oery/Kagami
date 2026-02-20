@@ -10,67 +10,60 @@ pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
     let format = get_format(field);
     let from = get_from(field);
 
-    match &field.ty {
-        Type::Path(type_path) => {
-            let path = &type_path.path;
+    let Type::Path(type_path) = &field.ty else {
+        panic!();
+    };
 
-            // last segment: Vec<T>, Option<T>, String, etc
-            let segment = path.segments.last().unwrap();
-            let ident = &segment.ident;
+    // last segment: Vec<T>, Option<T>, String, etc
+    let segment = &type_path.path.segments.last().unwrap();
+    let ident = &segment.ident;
 
-            let data_type = match from {
-                Some(ref data_type) => data_type.to_owned(),
-                None => ident.to_string(),
-            };
+    let data_type = match from {
+        Some(ref data_type) => data_type.to_owned(),
+        None => ident.to_string(),
+    };
 
-            let data_de = match data_type.as_str() {
-                "bool" => quote! {
-                    nom::bytes::streaming::take(1usize)(input)?;
-                    let #name = #name[0] == 1;
-                },
+    let data_de = match data_type.as_str() {
+        "i16" => quote! { short(input)?; },
+        "f32" => quote! { float(input)?; },
+        "Cow" => quote! { string(input)?; },
 
-                "u8" => quote! {
-                    nom::bytes::streaming::take(1usize)(input)?;
-                    let #name = #name[0];
-                },
+        "bool" => quote! {
+            nom::bytes::streaming::take(1usize)(input)?;
+            let #name = #name[0] == 1;
+        },
 
-                "i32" => match format {
-                    Format::Standard => quote! { int(input)?; },
-                    Format::VarInt => quote! { varint_i32(input)?; },
-                    _ => panic!("Unsupported format"),
-                },
+        "u8" => quote! {
+            nom::bytes::streaming::take(1usize)(input)?;
+            let #name = #name[0];
+        },
 
-                "i16" => quote! { short(input)?; },
+        "i32" => match format {
+            Format::Standard => quote! { int(input)?; },
+            Format::VarInt => quote! { varint_i32(input)?; },
+            _ => panic!("Unsupported format"),
+        },
 
-                "f32" => quote! { float(input)?; },
+        "String" => match format {
+            Format::Standard => quote! { string(input)?; },
+            _ => panic!("Unsupported format"),
+        },
 
-                "String" => match format {
-                    Format::Standard => quote! { string(input)?; },
-                    _ => panic!("Unsupported format"),
-                },
+        _ => match format {
+            Format::JSON => quote! { json::<#ident>(input)?; },
+            _ => quote! { #ident::deserialize(input)?; },
+        },
+    };
 
-                "Cow" => quote! { string(input)?; },
-
-                _ => match format {
-                    Format::JSON => quote! { json::<#ident>(input)?; },
-                    _ => quote! { #ident::deserialize(input)?; },
-                },
-            };
-
-            match from {
-                Some(_) => {
-                    quote! {
-                        {
-                            let (input, #name) = #data_de
-                            (input, #ident::from_repr(#name).unwrap())
-                        };
-                    }
-                }
-                None => data_de,
+    match from {
+        Some(_) => {
+            quote! {
+                {
+                    let (input, #name) = #data_de
+                    (input, #ident::from_repr(#name).unwrap())
+                };
             }
         }
-        _ => quote! {
-            Default::default()
-        },
+        None => data_de,
     }
 }
