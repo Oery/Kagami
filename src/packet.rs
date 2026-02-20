@@ -8,8 +8,6 @@ use nom::bytes::streaming::take;
 use nom::error::{Error, ErrorKind};
 use serde::de::DeserializeOwned;
 
-use crate::packets::data::*;
-
 #[derive(Debug, Default)]
 pub struct Packet<'a> {
     pub id: i32,
@@ -51,6 +49,7 @@ pub fn short(input: &[u8]) -> IResult<&[u8], i16> {
     Ok((input, val))
 }
 
+// TODO: Test this deserializer
 pub fn float(input: &[u8]) -> IResult<&[u8], f32> {
     let (input, bytes) = take(4usize)(input)?;
     let val = f32::from_be_bytes(bytes.try_into().unwrap());

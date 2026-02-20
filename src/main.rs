@@ -10,6 +10,7 @@ pub mod packet;
 mod packets;
 mod proxy;
 mod state;
+pub mod traits;
 mod varint;
 
 fn handle_ping(ctx: &mut Context<Chat>) {

@@ -22,13 +22,6 @@ impl Origin {
     }
 }
 
-enum State {
-    Handshake = 0,
-    Status = 1,
-    Login = 2,
-    Play = 3,
-}
-
 enum Format {
     Standard,
     VarInt,
@@ -129,25 +122,6 @@ fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStream 
                 false => quote! { (*#field) },
             };
 
-            // let field_own = match (is_struct_field, &from) {
-            //     (true, _) => quote! { &#field_acc },
-            //     (false, _) => quote! { *#field_acc },
-            // };
-
-            // let field = match (is_struct_field, &from) {
-            //     (true, None) => quote! { self.#name },
-            //     (_, Some(_)) => quote! { value },
-            //     _ => quote! { #name },
-            // };
-            //
-            // let field_borrow = match data_type.as_str() {
-            //     "i32" => field.clone(),
-            //     _ => match (is_struct_field, &from) {
-            //         (true, _) => quote! { &#field },
-            //         (false, _) => quote! { #field },
-            //     },
-            // };
-
             let data_ser = match data_type.as_str() {
                 "bool" => quote::quote! {
                     raw_payload.write(&[#field as u8])?;
@@ -215,7 +189,7 @@ fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStream 
     }
 }
 
-fn get_deser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStream {
+fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
     let name = &field.ident;
 
     let format = get_format(field);
@@ -232,17 +206,6 @@ fn get_deser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStrea
             let data_type = match from {
                 Some(ref data_type) => data_type.to_owned(),
                 None => ident.to_string(),
-            };
-
-            let field = match (is_struct_field, &from) {
-                (true, None) => quote! { self.#name },
-                (true, Some(_)) => quote! { value },
-                (false, _) => quote! { #name },
-            };
-
-            let field_own = match is_struct_field {
-                true => quote! { #field },
-                false => quote! { (*#field) },
             };
 
             let data_de = match data_type.as_str() {
@@ -295,43 +258,6 @@ fn get_deser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStrea
             Default::default()
         },
     }
-}
-
-fn last_path_segment(ty: &Type) -> Option<&syn::PathSegment> {
-    match ty {
-        Type::Path(p) => p.path.segments.last(),
-        _ => None,
-    }
-}
-
-fn cow_str(ty: &Type) -> Option<()> {
-    let seg = last_path_segment(ty)?;
-
-    if seg.ident != "Cow" {
-        return None;
-    }
-
-    let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
-        return None;
-    };
-
-    let mut it = args.args.iter();
-
-    match it.next()? {
-        syn::GenericArgument::Lifetime(_) => {}
-        _ => return None,
-    }
-
-    match it.next()? {
-        syn::GenericArgument::Type(syn::Type::Path(p)) if p.path.is_ident("str") => {}
-        _ => return None,
-    }
-
-    Some(())
-}
-
-fn is_cow_str(ty: &Type) -> bool {
-    cow_str(ty).is_some()
 }
 
 fn get_payload_impl(item: &DeriveInput, origin: &Origin) -> proc_macro2::TokenStream {
@@ -396,21 +322,20 @@ fn get_dispatch_impl(name: &Ident, origin: &Origin, generics: &Generics) -> proc
 }
 
 struct PacketAttributes {
-    state: State,
     id: i32,
     origin: Origin,
 }
 
 impl Parse for PacketAttributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let state_ident = input.parse::<syn::Ident>()?;
-        let state = match state_ident.to_string().as_str() {
-            "Handshake" => State::Handshake,
-            "Status" => State::Status,
-            "Login" => State::Login,
-            "Play" => State::Play,
-            _ => panic!("Invalid State"),
-        };
+        let _state_ident = input.parse::<syn::Ident>()?;
+        // let state = match state_ident.to_string().as_str() {
+        //     "Handshake" => State::Handshake,
+        //     "Status" => State::Status,
+        //     "Login" => State::Login,
+        //     "Play" => State::Play,
+        //     _ => panic!("Invalid State"),
+        // };
 
         input.parse::<syn::Token![,]>()?;
 
@@ -426,7 +351,7 @@ impl Parse for PacketAttributes {
             _ => panic!("Invalid Origin"),
         };
 
-        Ok(PacketAttributes { state, id, origin })
+        Ok(PacketAttributes { id, origin })
     }
 }
 
@@ -474,7 +399,7 @@ pub fn serializable(input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn packet(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let PacketAttributes { state, id, origin } = parse_macro_input!(attr as PacketAttributes);
+    let PacketAttributes { id, origin } = parse_macro_input!(attr as PacketAttributes);
     let derive_input = input.clone();
     let item = parse_macro_input!(derive_input as DeriveInput);
     let name = &item.ident;
@@ -513,7 +438,7 @@ fn get_serializable_struct_impl(item: &DeriveInput, data: &syn::DataStruct) -> T
 
     let field_desers = fields.named.iter().map(|field| {
         let name = &field.ident;
-        let deser_fn = get_deser_fn(&field, true);
+        let deser_fn = get_deser_fn(&field);
         quote! { let (input, #name) = #deser_fn }
     });
 
@@ -649,7 +574,7 @@ fn get_enum_variant_de(variant: &Variant, i: usize, discriminant: &mut i32) -> p
 
             let deserializers = fields.named.iter().map(|field| {
                 let name = &field.ident;
-                let de = get_deser_fn(field, false);
+                let de = get_deser_fn(field);
                 quote! { let (input, #name) = #de }
             });
 

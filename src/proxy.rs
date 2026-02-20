@@ -4,7 +4,7 @@ use crate::events::EventManager;
 use crate::packet::{Packet, packet};
 use crate::packets::{client, client::*, server, server::*};
 use crate::state::McState;
-use crate::traits::{Dispatch, Payload, SerializablePacket};
+use crate::traits::Dispatch;
 use crate::varint::temp_convert;
 
 use std::io::Write;

@@ -1,6 +1,6 @@
 use crate::{
     context::{BufferedStream, State},
-    packets::{client, data::ChatPosition, server},
+    packets::{data::ChatPosition, server},
     traits::{ClientPacket, ServerPacket},
     varint::temp_convert,
 };
