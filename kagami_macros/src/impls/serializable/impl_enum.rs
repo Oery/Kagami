@@ -22,7 +22,7 @@ fn get_field_discrim(variant: &Variant, discriminant: i32, i: i32) -> proc_macro
     }
 }
 
-fn get_variant_ser(variant: &Variant, discriminant: &mut i32, i: i32) -> proc_macro2::TokenStream {
+fn get_variant_ser(variant: &Variant, discriminant: &mut i32) -> proc_macro2::TokenStream {
     let name = &variant.ident;
 
     if let Some((_, Expr::Lit(ExprLit { attrs: _, lit: Lit::Int(d) }))) = &variant.discriminant {
@@ -30,15 +30,13 @@ fn get_variant_ser(variant: &Variant, discriminant: &mut i32, i: i32) -> proc_ma
         *discriminant = d;
     }
 
-    let current = *discriminant + i;
-
     match &variant.fields {
         Fields::Unit => quote! {
             Self :: #name => {},
         },
         Fields::Named(fields) => {
             let field_names = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
-            let field_sers = fields.named.iter().map(|field| get_ser_fn(&field, false));
+            let field_sers = fields.named.iter().map(|f| get_ser_fn(f, false));
 
             quote! {
                 Self :: #name { #( #field_names ),* } => {
@@ -99,7 +97,7 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
     let mut field_to_discriminant = vec![];
 
     for (i, variant) in data.variants.iter().enumerate() {
-        serializers.push(get_variant_ser(variant, &mut discriminant, i as i32));
+        serializers.push(get_variant_ser(variant, &mut discriminant));
         deserializers.push(get_variant_de(variant, &mut discriminant, i as i32));
         field_to_discriminant.push(get_field_discrim(variant, discriminant, i as i32));
     }
@@ -116,15 +114,6 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
         }
 
         impl<'a> #name #ty_generics {
-            pub fn serialize_enum() -> crate::error::PResult<()> {
-                unreachable!();
-                // match self {
-                //     #( #serializers )*
-                // };
-
-                Ok(())
-            }
-
             pub fn deserialize_enum(input: &'a [u8], discriminant: i32) -> nom::IResult<&'a [u8], Self> {
                 match discriminant {
                     #( #deserializers )*
@@ -145,7 +134,3 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
         }
     })
 }
-
-// If of type from, discriminant will be read first
-// Then deserialize will be called on the Enum but the discriminant will not be given,
-// The Enum needs both the name and input

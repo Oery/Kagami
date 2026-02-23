@@ -4,23 +4,6 @@ use syn::{Field, Type};
 use crate::format::*;
 use crate::utils::get_enum_repr;
 
-pub fn get_deser_test(field: &Field, format: &Format) -> proc_macro2::TokenStream {
-    let name = field.ident.as_ref().unwrap();
-
-    match name.to_string().as_str() {
-        "u8" => quote! {
-            nom::bytes::streaming::take(1usize)(input)?;
-            let #name = #name[0];
-        },
-        "i32" => match format {
-            Format::Standard => quote! { int(input)?; },
-            Format::VarInt => quote! { varint_i32(input)?; },
-            _ => panic!("unsupported format"),
-        },
-        _ => panic!("Unsupported format"),
-    }
-}
-
 pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
     let Type::Path(type_path) = &field.ty else {
         panic!("Deser Fn panic");
@@ -73,7 +56,7 @@ pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
         },
 
         _ => match format {
-            Format::JSON => quote! { json::<#ident>(input)?; },
+            Format::Json => quote! { json::<#ident>(input)?; },
             _ => quote! { #ident::deserialize(input)?; },
         },
     };

@@ -3,14 +3,14 @@ use syn::{Expr, ExprLit, Field, Lit, Meta};
 pub enum Format {
     Standard,
     VarInt,
-    JSON,
+    Json,
 }
 
 impl From<&str> for Format {
     fn from(s: &str) -> Self {
         match s {
             "varint" => Format::VarInt,
-            "json" => Format::JSON,
+            "json" => Format::Json,
             _ => Format::Standard,
         }
     }

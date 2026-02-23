@@ -6,13 +6,13 @@ pub enum Origin {
     Server,
 }
 
-impl Origin {
-    pub fn to_string(&self) -> String {
-        match self {
+impl std::fmt::Display for Origin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let origin = match self {
             Origin::Client => "client",
             Origin::Server => "server",
-        }
-        .into()
+        };
+        write!(f, "{origin}")
     }
 }
 

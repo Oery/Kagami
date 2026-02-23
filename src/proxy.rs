@@ -51,7 +51,7 @@ async fn handle_payload<'a, T: Dispatch<'a>>(
     Ok(())
 }
 
-fn next_packet<'a, 'b>(ctx: &ProxyContext<'_>, input: &'b [u8]) -> PResult<Option<(&'b [u8], Packet<'b>)>> {
+fn next_packet<'b>(ctx: &ProxyContext<'_>, input: &'b [u8]) -> PResult<Option<(&'b [u8], Packet<'b>)>> {
     let cmp = ctx.state.compress_threshold.load(Ordering::Relaxed);
 
     match packet(input, cmp) {
@@ -199,8 +199,8 @@ impl Proxy {
 
     pub async fn on_client_join(client: TcpStream, proxy: Arc<Proxy>) -> KResult<()> {
         let server = TcpStream::connect(HOST).await?;
-        let _ = server.set_nodelay(true)?;
-        let _ = client.set_nodelay(true)?;
+        server.set_nodelay(true)?;
+        client.set_nodelay(true)?;
 
         let (mut client_ctx, mut server_ctx) = ProxyContext::new(&client, &server, proxy);
         if let Err(e) = futures::try_join!(handle_stream(&mut client_ctx), handle_stream(&mut server_ctx)) {

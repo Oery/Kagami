@@ -14,7 +14,7 @@ pub fn get_serializable_struct_impl(item: &DeriveInput, data: &DataStruct) -> To
 
     let field_desers = fields.named.iter().map(|field| {
         let name = &field.ident;
-        let deser_fn = get_deser_fn(&field);
+        let deser_fn = get_deser_fn(field);
         quote! { let (input, #name) = #deser_fn }
     });
 

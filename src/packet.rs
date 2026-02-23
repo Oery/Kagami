@@ -15,7 +15,7 @@ pub struct Packet<'a> {
 }
 
 pub fn int(input: &[u8]) -> IResult<&[u8], i32> {
-    let (input, bytes) = take(4 as usize)(input)?;
+    let (input, bytes) = take(4_usize)(input)?;
     let val = i32::from_le_bytes(bytes.try_into().unwrap());
 
     Ok((input, val))
@@ -43,7 +43,7 @@ pub fn varint_i32(mut input: &[u8]) -> IResult<&[u8], i32> {
 }
 
 pub fn short(input: &[u8]) -> IResult<&[u8], i16> {
-    let (input, bytes) = take(2 as usize)(input)?;
+    let (input, bytes) = take(2_usize)(input)?;
     let val = i16::from_be_bytes(bytes.try_into().unwrap());
 
     Ok((input, val))
@@ -51,7 +51,7 @@ pub fn short(input: &[u8]) -> IResult<&[u8], i16> {
 
 // TODO: Test this deserializer
 pub fn float(input: &[u8]) -> IResult<&[u8], f32> {
-    let (input, bytes) = take(4usize)(input)?;
+    let (input, bytes) = take(4_usize)(input)?;
     let val = f32::from_be_bytes(bytes.try_into().unwrap());
 
     Ok((input, val))

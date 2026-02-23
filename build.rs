@@ -94,9 +94,10 @@ fn load_packets(packets: &mut Vec<ItemStruct>, path: &str) {
     let src = fs::read_to_string(path).expect("failed to read file");
     let file = parse_file(&src).expect("failed to parse Rust file");
 
-    file.items.iter().for_each(|item| match item {
-        syn::Item::Struct(s) => packets.push(s.clone()),
-        _ => {}
+    file.items.iter().for_each(|item| {
+        if let syn::Item::Struct(s) = item {
+            packets.push(s.clone())
+        }
     });
 }
 

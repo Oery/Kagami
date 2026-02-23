@@ -102,7 +102,7 @@ pub struct Position {
 impl Serializable<'_> for Duration {
     fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()> {
         let duration = self.as_millis() / 50;
-        payload.write(&crate::varint::temp_convert(duration as i32)?)?;
+        payload.write_all(&crate::varint::temp_convert(duration as i32)?)?;
         Ok(())
     }
 
@@ -119,12 +119,12 @@ impl Serializable<'_> for Position {
             | ((self.y as u64 & 0xFFF) << 26)
             | (self.z as u64 & 0x3FFFFFF);
 
-        payload.write(&val.to_be_bytes())?;
+        payload.write_all(&val.to_be_bytes())?;
         Ok(())
     }
 
     fn deserialize(input: &[u8]) -> IResult<&[u8], Position> {
-        let (input, bytes) = take(8 as usize)(input)?;
+        let (input, bytes) = take(8_usize)(input)?;
         let val: u64 = u64::from_be_bytes(bytes.try_into().unwrap());
 
         let mut x = (val >> 38) as i32;

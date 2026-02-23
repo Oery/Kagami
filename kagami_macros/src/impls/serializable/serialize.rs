@@ -37,42 +37,42 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
     };
 
     let data_ser = match data_type.as_str() {
-        "bool" => quote! {raw_payload.write(&[#field as u8])?; },
-        "u8" => quote! { raw_payload.write(&[#field])?; },
-        "i16" => quote! { raw_payload.write(&#field.to_be_bytes())?; },
+        "bool" => quote! {raw_payload.write_all(&[#field as u8])?; },
+        "u8" => quote! { raw_payload.write_all(&[#field])?; },
+        "i16" => quote! { raw_payload.write_all(&#field.to_be_bytes())?; },
 
         "i32" => match format {
             Format::Standard => {
-                quote! { raw_payload.write(&#field.to_le_bytes())?; }
+                quote! { raw_payload.write_all(&#field.to_le_bytes())?; }
             }
             Format::VarInt => {
-                quote! { raw_payload.write(&crate::varint::temp_convert(#field_own)?)?; }
+                quote! { raw_payload.write_all(&crate::varint::temp_convert(#field_own)?)?; }
             }
             _ => panic!("Unsupported format"),
         },
 
         "f32" => quote! {
-            raw_payload.write(&#field.to_be_bytes())?;
+            raw_payload.write_all(&#field.to_be_bytes())?;
         },
 
         "String" => match format {
             Format::Standard => quote! {
-                raw_payload.write(&crate::varint::temp_convert(#field.len() as i32)?)?;
-                raw_payload.write(#field.as_bytes())?;
+                raw_payload.write_all(&crate::varint::temp_convert(#field.len() as i32)?)?;
+                raw_payload.write_all(#field.as_bytes())?;
             },
             _ => panic!("Unsupported format"),
         },
 
         "Cow" => quote! {
-            raw_payload.write(&crate::varint::temp_convert(#field.len() as i32)?)?;
-            raw_payload.write(#field.as_bytes())?;
+            raw_payload.write_all(&crate::varint::temp_convert(#field.len() as i32)?)?;
+            raw_payload.write_all(#field.as_bytes())?;
         },
 
         _ => match format {
-            Format::JSON => quote! {
+            Format::Json => quote! {
                 let j = serde_json::to_string(&#field).unwrap();
-                raw_payload.write(&crate::varint::temp_convert(j.len() as i32)?)?;
-                raw_payload.write(j.as_bytes())?;
+                raw_payload.write_all(&crate::varint::temp_convert(j.len() as i32)?)?;
+                raw_payload.write_all(j.as_bytes())?;
             },
             _ => quote! { #field_own.serialize(raw_payload)?; },
         },
