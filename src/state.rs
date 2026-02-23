@@ -1,12 +1,13 @@
 use atomic_enum::atomic_enum;
-use strum::FromRepr;
+use kagami_macros::Serializable;
+
+use crate::traits::Serializable;
 
 #[atomic_enum]
-#[derive(FromRepr, PartialEq)]
-#[repr(i32)]
+#[derive(PartialEq, Serializable)]
 pub enum McState {
-    Handshake = 0,
-    Status = 1,
-    Login = 2,
-    Play = 3,
+    Handshake,
+    Status,
+    Login,
+    Play,
 }

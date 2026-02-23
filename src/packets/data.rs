@@ -6,22 +6,19 @@ use std::time::Duration;
 
 use nom::IResult;
 use nom::bytes::streaming::take;
-use strum::FromRepr;
 
 use crate::error::PResult;
 use crate::packet::*;
 use crate::traits::Serializable;
 
-#[repr(i32)]
-#[derive(Debug, Clone, Copy, FromRepr)]
+#[derive(Debug, Clone, Copy, Serializable)]
 pub enum Dimension {
     Nether = -1,
     Overworld = 0,
     End = 1,
 }
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, FromRepr)]
+#[derive(Debug, Clone, Copy, Serializable)]
 pub enum Difficulty {
     Peaceful,
     Easy,
@@ -29,16 +26,14 @@ pub enum Difficulty {
     Hard,
 }
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, FromRepr)]
+#[derive(Debug, Clone, Copy, Serializable)]
 pub enum GameMode {
     Survival,
     Creative,
     Adventure,
 }
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, FromRepr)]
+#[derive(Debug, Clone, Copy, Serializable)]
 pub enum AnimationKind {
     SwingArm,
     TakeDamage,
@@ -48,16 +43,14 @@ pub enum AnimationKind {
     MagicCriticalEffect,
 }
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, FromRepr)]
+#[derive(Debug, Clone, Copy, Serializable)]
 pub enum ChatPosition {
     Chat,
     System,
     HotBar,
 }
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, FromRepr)]
+#[derive(Debug, Clone, Copy, Serializable)]
 pub enum PotionEffect {
     Speed = 1,
     Slowness,
@@ -85,7 +78,6 @@ pub enum PotionEffect {
 }
 
 #[derive(Debug, Clone, Serializable)]
-#[my_repr(i32)]
 pub enum EventKind<'a> {
     CombatEnter,
     CombatEnd {
@@ -154,7 +146,6 @@ impl Serializable<'_> for Position {
 }
 
 #[derive(Debug, Serializable)]
-#[my_repr(i32)]
 pub enum ActionKind {
     StartSneaking,
     StopSneaking,
@@ -166,7 +157,6 @@ pub enum ActionKind {
 }
 
 #[derive(Debug, Serializable)]
-#[my_repr(i32)]
 pub enum InteractionKind {
     Interact,
     Attack,

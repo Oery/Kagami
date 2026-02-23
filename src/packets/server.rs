@@ -46,7 +46,7 @@ pub struct JoinGame<'a> {
     pub entity_id: i32,
     pub gamemode: u8,
     pub dimension: u8,
-    #[from = "u8"]
+    #[enum_as = "u8"]
     pub difficulty: Difficulty,
     pub max_players: u8,
     pub level_type: Cow<'a, str>,
@@ -57,7 +57,7 @@ pub struct JoinGame<'a> {
 #[packet(Play, 0x02, Server)]
 pub struct Chat<'a> {
     pub json: Cow<'a, str>,
-    #[from = "u8"]
+    #[enum_as = "u8"]
     pub position: ChatPosition,
 }
 
@@ -68,11 +68,11 @@ pub struct SpawnPosition {
 
 #[packet(Play, 0x07, Server)]
 pub struct Respawn<'a> {
-    #[from = "i32"]
+    #[enum_as = "i32"]
     pub dimension: Dimension,
-    #[from = "u8"]
+    #[enum_as = "u8"]
     pub difficulty: Difficulty,
-    #[from = "u8"]
+    #[enum_as = "u8"]
     pub game_mode: GameMode,
     pub level_type: Cow<'a, str>,
 }
@@ -86,7 +86,7 @@ pub struct HeldItemChange {
 pub struct Animation {
     #[format = "varint"]
     pub entity_id: i32,
-    #[from = "u8"]
+    #[enum_as = "u8"]
     pub kind: AnimationKind,
 }
 
@@ -100,7 +100,7 @@ pub struct Entity {
 pub struct EntityEffect {
     #[format = "varint"]
     pub entity_id: i32,
-    #[from = "u8"]
+    #[enum_as = "u8"]
     pub effect: PotionEffect,
     pub amplifier: u8,
     pub duration: Duration,
@@ -111,7 +111,7 @@ pub struct EntityEffect {
 pub struct RemoveEntityEffect {
     #[format = "varint"]
     pub entity_id: i32,
-    #[from = "u8"]
+    #[enum_as = "u8"]
     pub effect: PotionEffect,
 }
 

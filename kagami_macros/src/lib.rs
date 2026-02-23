@@ -7,7 +7,6 @@ mod impls;
 mod packet_attrs;
 mod utils;
 
-use format::*;
 use impls::*;
 use packet_attrs::*;
 
@@ -72,7 +71,7 @@ pub fn packet(attr: TokenStream, input: TokenStream) -> TokenStream {
     })
 }
 
-#[proc_macro_derive(Serializable, attributes(format, from, my_repr))]
+#[proc_macro_derive(Serializable, attributes(format, enum_as))]
 pub fn serializable_data(input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as DeriveInput);
 

@@ -29,5 +29,5 @@ pub fn get_format(field: &Field) -> Format {
         };
     }
 
-    return Format::Standard;
+    Format::Standard
 }

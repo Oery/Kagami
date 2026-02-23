@@ -18,7 +18,7 @@ pub struct Handshake<'a> {
     pub addr: Cow<'a, str>,
     pub port: i16,
     #[format = "varint"]
-    #[from = "i32"]
+    #[enum_as = "i32"]
     pub next_state: McState,
 }
 
@@ -36,6 +36,8 @@ pub struct Chat<'a> {
 pub struct UseEntity {
     #[format = "varint"]
     pub target: i32,
+    #[enum_as = "i32"]
+    #[format = "varint"]
     pub kind: InteractionKind,
 }
 
@@ -49,6 +51,8 @@ pub struct KeepAlive {
 pub struct EntityAction {
     #[format = "varint"]
     pub entity_id: i32,
+    #[format = "varint"]
+    #[enum_as = "i32"]
     pub action: ActionKind,
     #[format = "varint"]
     pub boost: i32,

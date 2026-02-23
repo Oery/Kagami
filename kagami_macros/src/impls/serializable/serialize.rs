@@ -1,15 +1,14 @@
-use proc_macro2::Span;
 use quote::quote;
-use syn::{Field, Ident, Type};
+use syn::{Field, Type};
 
 use crate::format::*;
-use crate::utils::get_from;
+use crate::utils::get_enum_repr;
 
 pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStream {
     let name = &field.ident;
 
     let format = get_format(field);
-    let from = get_from(field);
+    let from = get_enum_repr(field);
 
     let Type::Path(type_path) = &field.ty else {
         panic!();
@@ -80,13 +79,17 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
     };
 
     match from {
-        Some(_) => {
-            let ty_ident = Ident::new(&data_type, Span::call_site());
-            quote! {
-                let value = self.#name as #ty_ident;
+        Some(_) => match data_type.as_str() {
+            "u8" => quote! {
+                let value = self.#name.to_u8();
                 #data_ser
-            }
-        }
+            },
+            "i32" => quote! {
+                let value = self.#name.to_i32();
+                #data_ser
+            },
+            _ => panic!(),
+        },
         None => data_ser,
     }
 }

@@ -2,16 +2,39 @@ use quote::quote;
 use syn::{Field, Type};
 
 use crate::format::*;
-use crate::utils::get_from;
+use crate::utils::get_enum_repr;
+
+pub fn get_deser_test(field: &Field, format: &Format) -> proc_macro2::TokenStream {
+    let name = field.ident.as_ref().unwrap();
+
+    match name.to_string().as_str() {
+        "u8" => quote! {
+            nom::bytes::streaming::take(1usize)(input)?;
+            let #name = #name[0];
+        },
+        "i32" => match format {
+            Format::Standard => quote! { int(input)?; },
+            Format::VarInt => quote! { varint_i32(input)?; },
+            _ => panic!("unsupported format"),
+        },
+        _ => panic!("Unsupported format"),
+    }
+}
 
 pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
-    let name = &field.ident;
+    let Type::Path(type_path) = &field.ty else {
+        panic!("Deser Fn panic");
+    };
 
     let format = get_format(field);
-    let from = get_from(field);
+    let from = get_enum_repr(field);
+    let ty = &field.ty;
 
-    let Type::Path(type_path) = &field.ty else {
-        panic!();
+    let name = &field.ident;
+
+    let name = match from {
+        Some(_) => quote! { discriminant },
+        None => quote! { #name },
     };
 
     // last segment: Vec<T>, Option<T>, String, etc
@@ -55,12 +78,15 @@ pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
         },
     };
 
+    let name = &field.ident;
+
     match from {
         Some(_) => {
             quote! {
                 {
-                    let (input, #name) = #data_de
-                    (input, #ident::from_repr(#name).unwrap())
+                    let (input, discriminant) = #data_de
+                    let (input, #name) = #ty :: deserialize_enum(input, discriminant.into())?;
+                    (input, #name)
                 };
             }
         }

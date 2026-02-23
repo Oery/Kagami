@@ -1,11 +1,11 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{DeriveInput, Fields};
+use syn::{DataStruct, DeriveInput, Fields};
 
 use crate::impls::get_deser_fn;
 use crate::impls::get_ser_fn;
 
-pub fn get_serializable_struct_impl(item: &DeriveInput, data: &syn::DataStruct) -> TokenStream {
+pub fn get_serializable_struct_impl(item: &DeriveInput, data: &DataStruct) -> TokenStream {
     let name = &item.ident;
 
     let Fields::Named(fields) = &data.fields else {
@@ -18,7 +18,7 @@ pub fn get_serializable_struct_impl(item: &DeriveInput, data: &syn::DataStruct) 
         quote! { let (input, #name) = #deser_fn }
     });
 
-    let field_sers = fields.named.iter().map(|field| get_ser_fn(&field, true));
+    let field_sers = fields.named.iter().map(|field| get_ser_fn(field, true));
     let field_names = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
 
     let generics = &item.generics;

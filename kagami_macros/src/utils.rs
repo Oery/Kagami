@@ -16,10 +16,10 @@ pub fn to_snake_case(s: &str) -> String {
     out
 }
 
-pub fn get_from(field: &Field) -> Option<String> {
+pub fn get_enum_repr(field: &Field) -> Option<String> {
     for attr in &field.attrs {
         match &attr.meta {
-            Meta::NameValue(mnv) if mnv.path.is_ident("from") => {
+            Meta::NameValue(mnv) if mnv.path.is_ident("enum_as") => {
                 return match &mnv.value {
                     Expr::Lit(ExprLit { attrs: _, lit: Lit::Str(s) }) => Some(s.value()),
                     _ => None,
@@ -29,5 +29,5 @@ pub fn get_from(field: &Field) -> Option<String> {
         };
     }
 
-    return None;
+    None
 }

@@ -43,7 +43,7 @@ pub fn varint_i32(mut input: &[u8]) -> IResult<&[u8], i32> {
 }
 
 pub fn short(input: &[u8]) -> IResult<&[u8], i16> {
-    let (input, bytes) = take(2usize)(input)?;
+    let (input, bytes) = take(2 as usize)(input)?;
     let val = i16::from_be_bytes(bytes.try_into().unwrap());
 
     Ok((input, val))
@@ -61,9 +61,8 @@ pub fn string(input: &[u8]) -> IResult<&[u8], Cow<'_, str>> {
     let (input, length) = varint_i32(input)?;
     let (input, content) = take(length as usize)(input)?;
 
-    let string = match from_utf8(content) {
-        Ok(string) => string,
-        Err(_) => return Err(nom::Err::Failure(Error::new(input, ErrorKind::Fail))),
+    let Ok(string) = from_utf8(content) else {
+        return Err(nom::Err::Failure(Error::new(input, ErrorKind::Fail)));
     };
 
     Ok((input, Cow::from(string)))
