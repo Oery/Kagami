@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::packets::json::ChatComponent;
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Player {
     pub id: String,
@@ -22,7 +24,7 @@ pub struct Version {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Response {
-    pub description: String,
+    pub description: ChatComponent,
     pub players: Players,
     pub version: Version,
     pub favicon: String,

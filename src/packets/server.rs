@@ -55,8 +55,9 @@ pub struct JoinGame<'a> {
 
 // TODO: json is a JSON (obviously)
 #[packet(Play, 0x02, Server)]
-pub struct Chat<'a> {
-    pub json: Cow<'a, str>,
+pub struct Chat {
+    #[format = "json"]
+    pub json: ChatComponent,
     #[enum_as = "u8"]
     pub position: ChatPosition,
 }
