@@ -42,7 +42,6 @@ pub struct KeepAlive {
 // FIXME: Dimension is a byte here instead of an int
 #[packet(Play, 0x01, Server)]
 pub struct JoinGame<'a> {
-    #[format = "varint"]
     pub entity_id: i32,
     pub gamemode: u8,
     pub dimension: u8,
