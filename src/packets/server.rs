@@ -39,12 +39,13 @@ pub struct KeepAlive {
 
 // TODO: gamemode has a special bit for hardcore mode
 // TODO: level_type should be an enum
-// FIXME: Dimension is a byte here instead of an int
 #[packet(Play, 0x01, Server)]
 pub struct JoinGame<'a> {
     pub entity_id: i32,
-    pub gamemode: u8,
-    pub dimension: u8,
+    #[enum_as = "u8"]
+    pub gamemode: GameMode,
+    #[enum_as = "u8"]
+    pub dimension: Dimension,
     #[enum_as = "u8"]
     pub difficulty: Difficulty,
     pub max_players: u8,
