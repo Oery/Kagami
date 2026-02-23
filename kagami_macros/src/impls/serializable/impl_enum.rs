@@ -25,8 +25,18 @@ fn get_field_discrim(variant: &Variant, discriminant: i32, i: i32) -> proc_macro
 fn get_variant_ser(variant: &Variant, discriminant: &mut i32) -> proc_macro2::TokenStream {
     let name = &variant.ident;
 
-    if let Some((_, Expr::Lit(ExprLit { attrs: _, lit: Lit::Int(d) }))) = &variant.discriminant {
-        let d = d.base10_parse::<i32>().unwrap();
+    if let Some((_, expr)) = &variant.discriminant {
+        let d = match expr {
+            Expr::Lit(ExprLit { lit: Lit::Int(lit), .. }) => lit.base10_parse::<i32>().unwrap(),
+            Expr::Unary(syn::ExprUnary { op: syn::UnOp::Neg(_), expr, .. }) => {
+                if let Expr::Lit(ExprLit { lit: Lit::Int(lit), .. }) = &**expr {
+                    -lit.base10_parse::<i32>().unwrap()
+                } else {
+                    panic!("Unsupported negative expression")
+                }
+            }
+            _ => panic!("Unsupported discriminant expression"),
+        };
         *discriminant = d;
     }
 
@@ -51,12 +61,23 @@ fn get_variant_ser(variant: &Variant, discriminant: &mut i32) -> proc_macro2::To
 fn get_variant_de(variant: &Variant, discriminant: &mut i32, i: i32) -> proc_macro2::TokenStream {
     let name = &variant.ident;
 
-    if let Some((_, Expr::Lit(ExprLit { attrs: _, lit: Lit::Int(d) }))) = &variant.discriminant {
-        let d = d.base10_parse::<i32>().unwrap();
-        *discriminant = d;
-    }
+    let mut current = *discriminant + i;
 
-    let current = *discriminant + i;
+    if let Some((_, expr)) = &variant.discriminant {
+        let d = match expr {
+            Expr::Lit(ExprLit { lit: Lit::Int(lit), .. }) => lit.base10_parse::<i32>().unwrap(),
+            Expr::Unary(syn::ExprUnary { op: syn::UnOp::Neg(_), expr, .. }) => {
+                if let Expr::Lit(ExprLit { lit: Lit::Int(lit), .. }) = &**expr {
+                    -lit.base10_parse::<i32>().unwrap()
+                } else {
+                    panic!("Unsupported negative expression")
+                }
+            }
+            _ => panic!("Unsupported discriminant expression"),
+        };
+        *discriminant = d;
+        current = d;
+    }
 
     match &variant.fields {
         Fields::Unit => {
