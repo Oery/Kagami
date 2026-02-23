@@ -14,8 +14,8 @@ use crate::traits::Serializable;
 #[derive(Debug, Clone, Copy, Serializable)]
 pub enum Dimension {
     Nether = -1,
-    Overworld = 0,
-    End = 1,
+    Overworld,
+    End,
 }
 
 #[derive(Debug, Clone, Copy, Serializable)]

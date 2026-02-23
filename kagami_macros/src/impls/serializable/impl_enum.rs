@@ -5,11 +5,9 @@ use syn::{DeriveInput, Expr, ExprLit, Fields, Lit, Variant};
 use crate::impls::get_deser_fn;
 use crate::impls::get_ser_fn;
 
-fn get_field_discrim(variant: &Variant, discriminant: i32, i: i32) -> proc_macro2::TokenStream {
+fn get_field_discrim(variant: &Variant, discriminant: &mut i32, i: i32) -> proc_macro2::TokenStream {
     let name = &variant.ident;
-
-    let current = discriminant + i;
-    let current = current as u8;
+    let current = *discriminant + i;
 
     match &variant.fields {
         Fields::Unit => quote! {
@@ -120,8 +118,10 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
     for (i, variant) in data.variants.iter().enumerate() {
         serializers.push(get_variant_ser(variant, &mut discriminant));
         deserializers.push(get_variant_de(variant, &mut discriminant, i as i32));
-        field_to_discriminant.push(get_field_discrim(variant, discriminant, i as i32));
+        field_to_discriminant.push(get_field_discrim(variant, &mut discriminant, i as i32));
     }
+
+    let name_as_str = name.to_string();
 
     TokenStream::from(quote! {
         impl<'a> Serializable<'a> for #name #ty_generics {
@@ -138,19 +138,24 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
             pub fn deserialize_enum(input: &'a [u8], discriminant: i32) -> nom::IResult<&'a [u8], Self> {
                 match discriminant {
                     #( #deserializers )*
-                    _ => panic!("Unknown Variant"),
+                    _ => panic!("Unknown Variant for {}: {discriminant}", #name_as_str),
                 }
             }
 
             pub fn to_u8(&self) -> u8 {
+                let val = match self {
+                    #( #field_to_discriminant )*
+                    _ => panic!("Unknown Variant"),
+                };
+
+                val as u8
+            }
+
+            pub fn to_i32(&self) -> i32 {
                 match self {
                     #( #field_to_discriminant )*
                     _ => panic!("Unknown Variant"),
                 }
-            }
-
-            pub fn to_i32(&self) -> i32 {
-                self.to_u8() as i32
             }
         }
     })

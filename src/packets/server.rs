@@ -44,7 +44,7 @@ pub struct JoinGame<'a> {
     pub entity_id: i32,
     #[enum_as = "u8"]
     pub gamemode: GameMode,
-    #[enum_as = "u8"]
+    #[enum_as = "i8"]
     pub dimension: Dimension,
     #[enum_as = "u8"]
     pub difficulty: Difficulty,

@@ -39,6 +39,7 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
     let data_ser = match data_type.as_str() {
         "bool" => quote! {raw_payload.write_all(&[#field as u8])?; },
         "u8" => quote! { raw_payload.write_all(&[#field])?; },
+        "i8" => quote! { raw_payload.write_all(&[#field as u8])?; },
         "i16" => quote! { raw_payload.write_all(&#field.to_be_bytes())?; },
 
         "i32" => match format {
@@ -82,6 +83,10 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
         Some(_) => match data_type.as_str() {
             "u8" => quote! {
                 let value = self.#name.to_u8();
+                #data_ser
+            },
+            "i8" => quote! {
+                let value = self.#name.to_i32() as i8;
                 #data_ser
             },
             "i32" => quote! {

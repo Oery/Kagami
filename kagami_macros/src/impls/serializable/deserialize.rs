@@ -44,6 +44,11 @@ pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
             let #name = #name[0];
         },
 
+        "i8" => quote! {
+            nom::bytes::streaming::take(1usize)(input)?;
+            let #name = #name[0] as i8;
+        },
+
         "i32" => match format {
             Format::Standard => quote! { int(input)?; },
             Format::VarInt => quote! { varint_i32(input)?; },
