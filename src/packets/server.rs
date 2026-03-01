@@ -151,6 +151,13 @@ pub struct CloseWindow {
     pub window_id: u8,
 }
 
+#[packet(Play, 0x31, Server)]
+pub struct WindowProperty {
+    pub window_id: u8,
+    pub property: i16,
+    pub value: i16,
+}
+
 #[packet(Play, 0x36, Server)]
 pub struct OpenSignEditor {
     pub location: Position,
