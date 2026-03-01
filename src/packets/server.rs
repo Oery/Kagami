@@ -143,8 +143,9 @@ pub struct OpenSignEditor {
 
 // TODO: Reason is a JSON
 #[packet(Play, 0x40, Server)]
-pub struct Disconnect<'a> {
-    pub reason: Cow<'a, str>,
+pub struct Disconnect {
+    #[format = "json"]
+    pub reason: ChatComponent,
 }
 
 #[packet(Play, 0x41, Server)]
