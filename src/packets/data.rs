@@ -172,3 +172,10 @@ pub enum DiggingStatus {
     DropStack,
     FinishSlow,
 }
+
+#[derive(Debug, Serializable)]
+pub enum ChatMode {
+    Shown,
+    CommandsOnly,
+    Hidden,
+}

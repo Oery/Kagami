@@ -83,3 +83,13 @@ pub struct UpdateSign {
     #[format = "json"]
     pub line4: ChatComponent,
 }
+
+#[packet(Play, 0x15, Client)]
+pub struct ClientSettings<'a> {
+    pub locale: Cow<'a, str>,
+    pub view_distance: i8,
+    #[enum_as = "i8"]
+    pub chat_mode: ChatMode,
+    pub chat_colors: bool,
+    pub skin_parts: u8,
+}
