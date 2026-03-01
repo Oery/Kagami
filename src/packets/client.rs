@@ -27,6 +27,12 @@ pub struct LegacyPing {
     pub payload: u8,
 }
 
+#[packet(Play, 0x00, Client)]
+pub struct KeepAlive {
+    #[format = "varint"]
+    pub id: i32,
+}
+
 #[packet(Play, 0x01, Client)]
 pub struct Chat<'a> {
     pub message: Cow<'a, str>,
@@ -42,9 +48,10 @@ pub struct UseEntity {
 }
 
 #[packet(Play, 0x05, Client)]
-pub struct KeepAlive {
-    #[format = "varint"]
-    pub id: i32,
+pub struct PlayerLook {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub on_ground: bool,
 }
 
 #[packet(Play, 0x07, Client)]
