@@ -116,6 +116,15 @@ pub struct RemoveEntityEffect {
     pub effect: PotionEffect,
 }
 
+#[packet(Play, 0x1F, Server)]
+pub struct SetExperience {
+    pub experience_bar: f32,
+    #[format = "varint"]
+    pub level: i32,
+    #[format = "varint"]
+    pub total_experience: i32,
+}
+
 #[packet(Play, 0x2E, Server)]
 pub struct CloseWindow {
     pub window_id: u8,
