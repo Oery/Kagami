@@ -65,3 +65,8 @@ pub struct EntityAction {
     #[format = "varint"]
     pub boost: i32,
 }
+
+#[packet(Play, 0x0D, Client)]
+pub struct CloseWindow {
+    pub window_id: u8,
+}
