@@ -142,6 +142,12 @@ pub struct Disconnect<'a> {
     pub reason: Cow<'a, str>,
 }
 
+#[packet(Play, 0x41, Server)]
+pub struct ServerDifficulty {
+    #[enum_as = "u8"]
+    pub difficulty: Difficulty,
+}
+
 #[packet(Play, 0x42, Server)]
 pub struct CombatEvent<'a> {
     #[format = "varint"]
