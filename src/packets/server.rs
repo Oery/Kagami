@@ -132,6 +132,14 @@ pub struct SetExperience {
     pub total_experience: i32,
 }
 
+#[packet(Play, 0x25, Server)]
+pub struct BlockBreakAnimation {
+    #[format = "varint"]
+    pub animation_id: i32,
+    pub location: Position,
+    pub stage: i8,
+}
+
 #[packet(Play, 0x2B, Server)]
 pub struct ChangeGameState {
     #[enum_as = "u8"]
