@@ -192,6 +192,19 @@ pub struct WindowProperty {
     pub value: i16,
 }
 
+#[packet(Play, 0x33, Server)]
+pub struct UpdateSign {
+    pub location: Position,
+    #[format = "json"]
+    pub line1: ChatComponent,
+    #[format = "json"]
+    pub line2: ChatComponent,
+    #[format = "json"]
+    pub line3: ChatComponent,
+    #[format = "json"]
+    pub line4: ChatComponent,
+}
+
 #[packet(Play, 0x36, Server)]
 pub struct OpenSignEditor {
     pub location: Position,
