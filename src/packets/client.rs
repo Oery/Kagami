@@ -55,6 +55,11 @@ pub struct PlayerDigging {
     pub face: u8,
 }
 
+#[packet(Play, 0x09, Client)]
+pub struct HeldItemChange {
+    pub slot: i16,
+}
+
 #[packet(Play, 0x0B, Client)]
 pub struct EntityAction {
     #[format = "varint"]
