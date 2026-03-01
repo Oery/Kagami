@@ -53,7 +53,6 @@ pub struct JoinGame<'a> {
     pub reduced_debug_info: bool,
 }
 
-// TODO: json is a JSON (obviously)
 #[packet(Play, 0x02, Server)]
 pub struct Chat {
     #[format = "json"]
