@@ -78,6 +78,13 @@ pub struct Respawn<'a> {
     pub level_type: Cow<'a, str>,
 }
 
+#[packet(Play, 0x0A, Server)]
+pub struct UseBed {
+    #[format = "varint"]
+    pub entity_id: i32,
+    pub location: Position,
+}
+
 #[packet(Play, 0x09, Server)]
 pub struct HeldItemChange {
     pub slot: u8,
