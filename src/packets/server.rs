@@ -164,6 +164,16 @@ pub struct BlockBreakAnimation {
     pub stage: i8,
 }
 
+#[packet(Play, 0x29, Server)]
+pub struct SoundEffect<'a> {
+    pub sound_name: Cow<'a, str>,
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+    pub volume: f32,
+    pub pitch: u8,
+}
+
 #[packet(Play, 0x2B, Server)]
 pub struct ChangeGameState {
     #[enum_as = "u8"]
