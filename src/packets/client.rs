@@ -90,6 +90,12 @@ pub struct ConfirmTransaction {
     pub accepted: bool,
 }
 
+#[packet(Play, 0x11, Client)]
+pub struct EnchantItem {
+    pub window_id: u8,
+    pub enchantment: u8,
+}
+
 #[packet(Play, 0x12, Client)]
 pub struct UpdateSign {
     pub location: Position,
