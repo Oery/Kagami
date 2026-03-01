@@ -70,3 +70,16 @@ pub struct EntityAction {
 pub struct CloseWindow {
     pub window_id: u8,
 }
+
+#[packet(Play, 0x12, Client)]
+pub struct UpdateSign {
+    pub location: Position,
+    #[format = "json"]
+    pub line1: ChatComponent,
+    #[format = "json"]
+    pub line2: ChatComponent,
+    #[format = "json"]
+    pub line3: ChatComponent,
+    #[format = "json"]
+    pub line4: ChatComponent,
+}
