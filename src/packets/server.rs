@@ -97,6 +97,13 @@ pub struct Entity {
     pub entity_id: i32,
 }
 
+#[packet(Play, 0x1B, Server)]
+pub struct AttachEntity {
+    pub entity_id: i32,
+    pub vehicle_id: i32,
+    pub leash: bool,
+}
+
 #[packet(Play, 0x1D, Server)]
 pub struct EntityEffect {
     #[format = "varint"]
