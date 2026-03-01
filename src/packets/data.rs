@@ -186,3 +186,39 @@ pub enum ClientStatusAction {
     RequestStats,
     OpenInventory,
 }
+
+// TODO: Use duration for fade
+#[derive(Debug, Serializable)]
+pub enum GameStateReason {
+    InvalidBed {
+        x: f32,
+    },
+    RainingEnd {
+        x: f32,
+    },
+    RainingBegin {
+        x: f32,
+    },
+    ChangeGamemode {
+        #[enum_as = "f32"]
+        game_mode: GameMode,
+    },
+    EnterCredits {
+        x: f32,
+    },
+    DemoMessage {
+        x: f32,
+    },
+    ArrowHit {
+        x: f32,
+    },
+    FadeValue {
+        darkness: f32,
+    },
+    FadeTime {
+        fade_duration: f32,
+    },
+    PlayMobAppearance {
+        x: f32,
+    },
+}

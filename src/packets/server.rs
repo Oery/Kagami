@@ -125,6 +125,12 @@ pub struct SetExperience {
     pub total_experience: i32,
 }
 
+#[packet(Play, 0x2B, Server)]
+pub struct ChangeGameState {
+    #[enum_as = "u8"]
+    pub reason: GameStateReason,
+}
+
 #[packet(Play, 0x2E, Server)]
 pub struct CloseWindow {
     pub window_id: u8,
