@@ -153,3 +153,9 @@ pub struct CombatEvent<'a> {
     #[format = "varint"]
     pub event: EventKind<'a>,
 }
+
+#[packet(Play, 0x43, Server)]
+pub struct SpectateEntity {
+    #[format = "varint"]
+    pub entity_id: i32,
+}
