@@ -31,6 +31,7 @@ pub enum GameMode {
     Survival,
     Creative,
     Adventure,
+    Spectator,
 }
 
 #[derive(Debug, Clone, Copy, Serializable)]
