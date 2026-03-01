@@ -180,3 +180,9 @@ pub struct SpectateEntity {
     #[format = "varint"]
     pub entity_id: i32,
 }
+
+#[packet(Play, 0x48, Server)]
+pub struct ResourcePackSend<'a> {
+    pub url: Cow<'a, str>,
+    pub hash: Cow<'a, str>,
+}
