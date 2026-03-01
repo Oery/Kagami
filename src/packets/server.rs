@@ -136,6 +136,11 @@ pub struct CloseWindow {
     pub window_id: u8,
 }
 
+#[packet(Play, 0x36, Server)]
+pub struct OpenSignEditor {
+    pub location: Position,
+}
+
 // TODO: Reason is a JSON
 #[packet(Play, 0x40, Server)]
 pub struct Disconnect<'a> {
