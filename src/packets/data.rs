@@ -162,3 +162,13 @@ pub enum InteractionKind {
     Attack,
     InteractAt { x: f32, y: f32, z: f32 },
 }
+
+#[derive(Debug, Serializable)]
+pub enum DiggingStatus {
+    Started,
+    Cancelled,
+    Finished,
+    DropItem,
+    DropStack,
+    FinishSlow,
+}

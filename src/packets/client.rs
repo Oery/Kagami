@@ -47,6 +47,14 @@ pub struct KeepAlive {
     pub id: i32,
 }
 
+#[packet(Play, 0x07, Client)]
+pub struct PlayerDigging {
+    #[enum_as = "u8"]
+    pub status: DiggingStatus,
+    pub location: Position,
+    pub face: u8,
+}
+
 #[packet(Play, 0x0B, Client)]
 pub struct EntityAction {
     #[format = "varint"]
