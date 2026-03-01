@@ -67,6 +67,14 @@ pub struct SpawnPosition {
     pub location: Position,
 }
 
+#[packet(Play, 0x06, Server)]
+pub struct UpdateHealth {
+    pub health: f32,
+    #[format = "varint"]
+    pub food: i32,
+    pub saturation: f32,
+}
+
 #[packet(Play, 0x07, Server)]
 pub struct Respawn<'a> {
     #[enum_as = "i32"]
