@@ -179,3 +179,10 @@ pub enum ChatMode {
     CommandsOnly,
     Hidden,
 }
+
+#[derive(Debug, Serializable)]
+pub enum ClientStatusAction {
+    Respawn,
+    RequestStats,
+    OpenInventory,
+}

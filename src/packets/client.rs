@@ -93,3 +93,10 @@ pub struct ClientSettings<'a> {
     pub chat_colors: bool,
     pub skin_parts: u8,
 }
+
+#[packet(Play, 0x16, Client)]
+pub struct ClientStatus {
+    #[enum_as = "i32"]
+    #[format = "varint"]
+    pub action: ClientStatusAction,
+}
