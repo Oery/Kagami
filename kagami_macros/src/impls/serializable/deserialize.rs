@@ -73,7 +73,7 @@ pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
             quote! {
                 {
                     let (input, discriminant) = #data_de
-                    let (input, #name) = #ty :: deserialize_enum(input, discriminant.into())?;
+                    let (input, #name) = #ty :: deserialize_enum(input, discriminant as i32)?;
                     (input, #name)
                 };
             }

@@ -135,6 +135,15 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
         }
 
         impl<'a> #name #ty_generics {
+            pub fn serialize_enum(&'a self, raw_payload: &'a mut Vec<u8>) -> crate::error::PResult<()> {
+                match self {
+                    #( #serializers )*
+                    _ => panic!("Unknown Variant for {}: {:?}", #name_as_str, self),
+                };
+
+                Ok(())
+            }
+
             pub fn deserialize_enum(input: &'a [u8], discriminant: i32) -> nom::IResult<&'a [u8], Self> {
                 match discriminant {
                     #( #deserializers )*
@@ -143,10 +152,7 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
             }
 
             pub fn to_u8(&self) -> u8 {
-                let val = match self {
-                    #( #field_to_discriminant )*
-                    _ => panic!("Unknown Variant"),
-                };
+                let val = self.to_i32();
 
                 val as u8
             }
@@ -156,6 +162,12 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
                     #( #field_to_discriminant )*
                     _ => panic!("Unknown Variant"),
                 }
+            }
+
+            pub fn to_f32(&self) -> f32 {
+                let val = self.to_i32();
+
+                val as f32
             }
         }
     })

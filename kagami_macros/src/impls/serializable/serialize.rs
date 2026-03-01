@@ -27,7 +27,7 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
 
     let field = match (is_struct_field, &from) {
         (true, None) => quote! { self.#name },
-        (true, Some(_)) => quote! { value },
+        (_, Some(_)) => quote! { value },
         (false, _) => quote! { #name },
     };
 
@@ -79,19 +79,32 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
         },
     };
 
+    let field = match is_struct_field {
+        true => quote! { self.#name },
+        false => quote! { #name },
+    };
+
     match from {
         Some(_) => match data_type.as_str() {
             "u8" => quote! {
-                let value = self.#name.to_u8();
+                let value = #field.to_u8();
                 #data_ser
+                #field.serialize_enum(raw_payload)?;
             },
             "i8" => quote! {
-                let value = self.#name.to_i32() as i8;
+                let value = #field.to_i32() as i8;
                 #data_ser
+                #field.serialize_enum(raw_payload)?;
             },
             "i32" => quote! {
-                let value = self.#name.to_i32();
+                let value = #field.to_i32();
                 #data_ser
+                #field.serialize_enum(raw_payload)?;
+            },
+            "f32" => quote! {
+                let value = #field.to_f32();
+                #data_ser
+                #field.serialize_enum(raw_payload)?;
             },
             _ => panic!(),
         },
