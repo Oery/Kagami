@@ -76,6 +76,13 @@ pub struct CloseWindow {
     pub window_id: u8,
 }
 
+#[packet(Play, 0x0F, Client)]
+pub struct ConfirmTransaction {
+    pub window_id: i8,
+    pub action_number: i16,
+    pub accepted: bool,
+}
+
 #[packet(Play, 0x12, Client)]
 pub struct UpdateSign {
     pub location: Position,
