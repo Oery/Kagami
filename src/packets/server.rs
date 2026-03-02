@@ -255,6 +255,13 @@ pub struct SpectateEntity {
     pub entity_id: i32,
 }
 
+#[packet(Play, 0x45, Server)]
+pub struct Title {
+    #[format = "varint"]
+    #[enum_as = "i32"]
+    pub action: TitleAction,
+}
+
 #[packet(Play, 0x48, Server)]
 pub struct ResourcePackSend<'a> {
     pub url: Cow<'a, str>,

@@ -249,3 +249,23 @@ pub enum UpdateScoreAction<'a> {
         objective: Cow<'a, str>,
     },
 }
+
+// TODO: Use duration for SetTimes fields
+#[derive(Debug, Serializable)]
+pub enum TitleAction {
+    SetTitle {
+        #[format = "json"]
+        text: ChatComponent,
+    },
+    SetSubtitle {
+        #[format = "json"]
+        text: ChatComponent,
+    },
+    SetTimes {
+        fade_in: i32,
+        stay: i32,
+        fade_out: i32,
+    },
+    Clear,
+    Reset,
+}
