@@ -8,7 +8,7 @@ use crate::events::{Context, EventManager};
 use crate::packet::Packet;
 
 pub trait Serializable<'a>: Sized {
-    fn serialize(&'a self, payload: &'a mut Vec<u8>) -> PResult<()>;
+    fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()>;
     fn deserialize(input: &'a [u8]) -> IResult<&'a [u8], Self>;
 }
 

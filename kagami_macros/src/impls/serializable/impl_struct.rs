@@ -26,7 +26,7 @@ pub fn get_serializable_struct_impl(item: &DeriveInput, data: &DataStruct) -> To
 
     TokenStream::from(quote! {
         impl<'a> Serializable<'a> for #name #ty_generics {
-            fn serialize(&'a self, raw_payload: &'a mut Vec<u8>) -> crate::error::PResult<()> {
+            fn serialize(&self, raw_payload: &mut Vec<u8>) -> crate::error::PResult<()> {
                 #( #field_sers )*
 
                 Ok(())

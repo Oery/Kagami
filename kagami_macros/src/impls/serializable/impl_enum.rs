@@ -125,7 +125,7 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
 
     TokenStream::from(quote! {
         impl<'a> Serializable<'a> for #name #ty_generics {
-            fn serialize(&'a self, raw_payload: &'a mut Vec<u8>) -> crate::error::PResult<()> {
+            fn serialize(&self, raw_payload: &mut Vec<u8>) -> crate::error::PResult<()> {
                 panic!("Enum should not be serialized with this")
             }
 
