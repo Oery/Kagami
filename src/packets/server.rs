@@ -225,6 +225,11 @@ pub struct OpenSignEditor {
     pub location: Position,
 }
 
+#[packet(Play, 0x3A, Server)]
+pub struct TabComplete<'a> {
+    pub matches: Vec<Cow<'a, str>>,
+}
+
 #[packet(Play, 0x3B, Server)]
 pub struct ScoreboardObjective<'a> {
     pub name: Cow<'a, str>,
