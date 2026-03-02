@@ -218,6 +218,13 @@ pub struct OpenSignEditor {
 }
 
 // TODO: Reason is a JSON
+#[packet(Play, 0x3C, Server)]
+pub struct UpdateScore<'a> {
+    pub score_name: Cow<'a, str>,
+    #[enum_as = "i8"]
+    pub action: UpdateScoreAction<'a>,
+}
+
 #[packet(Play, 0x40, Server)]
 pub struct Disconnect {
     #[format = "json"]

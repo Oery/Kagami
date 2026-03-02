@@ -223,3 +223,15 @@ pub enum GameStateReason {
         x: f32,
     },
 }
+
+#[derive(Debug, Serializable)]
+pub enum UpdateScoreAction<'a> {
+    Set {
+        objective: Cow<'a, str>,
+        #[format = "varint"]
+        value: i32,
+    },
+    Remove {
+        objective: Cow<'a, str>,
+    },
+}
