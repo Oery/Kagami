@@ -114,6 +114,15 @@ pub struct CollectItem {
     pub collector_entity_id: i32,
 }
 
+#[packet(Play, 0x10, Server)]
+pub struct SpawnPainting<'a> {
+    #[format = "varint"]
+    pub entity_id: i32,
+    pub title: Cow<'a, str>,
+    pub location: Position,
+    pub direction: u8,
+}
+
 #[packet(Play, 0x12, Server)]
 pub struct EntityVelocity {
     #[format = "varint"]
