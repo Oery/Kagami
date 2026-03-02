@@ -1,12 +1,17 @@
 use std::borrow::Cow;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::str::from_utf8;
 
 use flate2::read::ZlibDecoder;
 use nom::IResult;
+use nom::Parser;
 use nom::bytes::streaming::take;
 use nom::error::{Error, ErrorKind};
+use nom::multi::many_m_n;
 use serde::de::DeserializeOwned;
+
+use crate::error::PResult;
+use crate::traits::Serializable;
 
 #[derive(Debug, Default)]
 pub struct Packet<'a> {
@@ -124,6 +129,39 @@ pub fn compressed_packet(input: &[u8], size: usize) -> IResult<&[u8], (i32, Vec<
     // println!("Decompressed packet with id 0x{id:2X}");
 
     Ok((input, (id, raw_payload.to_owned())))
+}
+
+// TODO: Support Format && EnumAs
+impl<'a, T: Serializable<'a>> Serializable<'a> for Vec<T> {
+    fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()> {
+        payload.write_all(&crate::varint::temp_convert(self.len() as i32)?)?;
+
+        for x in self {
+            x.serialize(payload)?;
+        }
+
+        Ok(())
+    }
+
+    fn deserialize(input: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
+        let (input, n) = varint_i32(input)?;
+
+        let (input, my_vec) = many_m_n(n as usize, n as usize, T::deserialize).parse(input)?;
+        Ok((input, my_vec))
+    }
+}
+
+impl<'a> Serializable<'a> for std::borrow::Cow<'a, str> {
+    fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()> {
+        payload.write_all(&crate::varint::temp_convert(self.len() as i32)?)?;
+        payload.write_all(self.as_bytes())?;
+
+        Ok(())
+    }
+
+    fn deserialize(input: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
+        string(input)
+    }
 }
 
 pub fn i32_to_varint(mut value: i32) -> Vec<u8> {
