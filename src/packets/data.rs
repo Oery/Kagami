@@ -224,6 +224,20 @@ pub enum GameStateReason {
     },
 }
 
+// TODO: Replace Kind with an Enum
+#[derive(Debug, Serializable)]
+pub enum ScoreboardObjectiveMode<'a> {
+    CreateScoreboard {
+        display_name: Cow<'a, str>,
+        kind: Cow<'a, str>,
+    },
+    RenomeScoreboard,
+    UpdateText {
+        display_name: Cow<'a, str>,
+        kind: Cow<'a, str>,
+    },
+}
+
 #[derive(Debug, Serializable)]
 pub enum UpdateScoreAction<'a> {
     Set {

@@ -217,7 +217,13 @@ pub struct OpenSignEditor {
     pub location: Position,
 }
 
-// TODO: Reason is a JSON
+#[packet(Play, 0x3B, Server)]
+pub struct ScoreboardObjective<'a> {
+    pub name: Cow<'a, str>,
+    #[enum_as = "i8"]
+    pub mode: ScoreboardObjectiveMode<'a>,
+}
+
 #[packet(Play, 0x3C, Server)]
 pub struct UpdateScore<'a> {
     pub score_name: Cow<'a, str>,
