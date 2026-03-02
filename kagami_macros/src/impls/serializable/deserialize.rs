@@ -68,6 +68,14 @@ pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
 
     let name = &field.ident;
 
+    // Strip Generics
+    let mut ty = field.ty.clone();
+    if let Type::Path(syn::TypePath { path, .. }) = &mut ty {
+        if let Some(last) = path.segments.last_mut() {
+            last.arguments = syn::PathArguments::None;
+        }
+    }
+
     match from {
         Some(_) => {
             quote! {
