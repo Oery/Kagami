@@ -9,6 +9,7 @@ use std::time::Duration;
 use crate::events::*;
 use crate::packet::*;
 use crate::packets::data::*;
+use crate::packets::item::Item;
 use crate::packets::json::*;
 use crate::traits::*;
 
@@ -190,6 +191,13 @@ pub struct ChangeGameState {
 #[packet(Play, 0x2E, Server)]
 pub struct CloseWindow {
     pub window_id: u8,
+}
+
+#[packet(Play, 0x2F, Server)]
+pub struct SetSlot {
+    pub window_id: u8,
+    pub slot: i16,
+    pub item: Option<Item>,
 }
 
 #[packet(Play, 0x31, Server)]
