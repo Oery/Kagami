@@ -262,6 +262,14 @@ pub struct Title {
     pub action: TitleAction,
 }
 
+#[packet(Play, 0x47, Server)]
+pub struct PlayerListHeaderAndFooter {
+    #[format = "json"]
+    pub header: ChatComponent,
+    #[format = "json"]
+    pub footer: ChatComponent,
+}
+
 #[packet(Play, 0x48, Server)]
 pub struct ResourcePackSend<'a> {
     pub url: Cow<'a, str>,
