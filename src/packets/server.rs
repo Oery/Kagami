@@ -105,6 +105,14 @@ pub struct Animation {
     pub kind: AnimationKind,
 }
 
+#[packet(Play, 0x0D, Server)]
+pub struct CollectItem {
+    #[format = "varint"]
+    pub collected_entity_id: i32,
+    #[format = "varint"]
+    pub collector_entity_id: i32,
+}
+
 #[packet(Play, 0x12, Server)]
 pub struct EntityVelocity {
     #[format = "varint"]
