@@ -86,6 +86,16 @@ pub struct Respawn<'a> {
     pub level_type: Cow<'a, str>,
 }
 
+#[packet(Play, 0x08, Server)]
+pub struct PlayerPositionAndLook {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub yaw: f32,
+    pub pitch: f32,
+    pub flags: u8,
+}
+
 #[packet(Play, 0x0A, Server)]
 pub struct UseBed {
     #[format = "varint"]
@@ -123,6 +133,17 @@ pub struct SpawnPainting<'a> {
     pub direction: u8,
 }
 
+// NOTE: x/y/z are Fixed-Point i32 — actual position = value / 32.0
+#[packet(Play, 0x11, Server)]
+pub struct SpawnExperienceOrb {
+    #[format = "varint"]
+    pub entity_id: i32,
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+    pub count: i16,
+}
+
 #[packet(Play, 0x12, Server)]
 pub struct EntityVelocity {
     #[format = "varint"]
@@ -136,6 +157,15 @@ pub struct EntityVelocity {
 pub struct Entity {
     #[format = "varint"]
     pub entity_id: i32,
+}
+
+#[packet(Play, 0x16, Server)]
+pub struct EntityLook {
+    #[format = "varint"]
+    pub entity_id: i32,
+    pub yaw: u8,
+    pub pitch: u8,
+    pub on_ground: bool,
 }
 
 #[packet(Play, 0x1B, Server)]

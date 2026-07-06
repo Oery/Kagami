@@ -47,8 +47,31 @@ pub struct UseEntity {
     pub kind: InteractionKind,
 }
 
+#[packet(Play, 0x03, Client)]
+pub struct Player {
+    pub on_ground: bool,
+}
+
+#[packet(Play, 0x04, Client)]
+pub struct PlayerPosition {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub on_ground: bool,
+}
+
 #[packet(Play, 0x05, Client)]
 pub struct PlayerLook {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub on_ground: bool,
+}
+
+#[packet(Play, 0x06, Client)]
+pub struct PlayerPositionAndLook {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
     pub yaw: f32,
     pub pitch: f32,
     pub on_ground: bool,
