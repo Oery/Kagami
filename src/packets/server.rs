@@ -264,6 +264,13 @@ pub struct OpenSignEditor {
     pub location: Position,
 }
 
+#[packet(Play, 0x39, Server)]
+pub struct PlayerAbilities {
+    pub flags: AbilityFlags,
+    pub flying_speed: f32,
+    pub walking_speed: f32,
+}
+
 #[packet(Play, 0x3A, Server)]
 pub struct TabComplete<'a> {
     pub matches: Vec<Cow<'a, str>>,

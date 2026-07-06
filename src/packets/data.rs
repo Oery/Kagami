@@ -174,6 +174,66 @@ pub enum DiggingStatus {
     FinishSlow,
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct AbilityFlags(pub u8);
+
+impl std::fmt::Debug for AbilityFlags {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AbilityFlags")
+            .field("invulnerable", &self.is_invulnerable())
+            .field("flying", &self.is_flying())
+            .field("allow_flying", &self.is_allow_flying())
+            .field("creative_mode", &self.is_creative_mode())
+            .finish()
+    }
+}
+
+impl AbilityFlags {
+    pub fn is_invulnerable(&self) -> bool {
+        self.0 & 0x01 != 0
+    }
+
+    pub fn set_invulnerable(&mut self, value: bool) {
+        if value { self.0 |= 0x01; } else { self.0 &= !0x01; }
+    }
+
+    pub fn is_flying(&self) -> bool {
+        self.0 & 0x02 != 0
+    }
+
+    pub fn set_flying(&mut self, value: bool) {
+        if value { self.0 |= 0x02; } else { self.0 &= !0x02; }
+    }
+
+    pub fn is_allow_flying(&self) -> bool {
+        self.0 & 0x04 != 0
+    }
+
+    pub fn set_allow_flying(&mut self, value: bool) {
+        if value { self.0 |= 0x04; } else { self.0 &= !0x04; }
+    }
+
+    pub fn is_creative_mode(&self) -> bool {
+        self.0 & 0x08 != 0
+    }
+
+    pub fn set_creative_mode(&mut self, value: bool) {
+        if value { self.0 |= 0x08; } else { self.0 &= !0x08; }
+    }
+}
+
+impl Serializable<'_> for AbilityFlags {
+    fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()> {
+        payload.write_all(&[self.0])?;
+        Ok(())
+    }
+
+    fn deserialize(input: &[u8]) -> IResult<&[u8], Self> {
+        let (input, byte) = take(1usize)(input)?;
+        Ok((input, AbilityFlags(byte[0])))
+    }
+}
+
 #[derive(Debug, Serializable)]
 pub enum ChatMode {
     Shown,
