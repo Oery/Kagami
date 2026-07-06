@@ -132,6 +132,13 @@ pub struct UpdateSign {
     pub line4: ChatComponent,
 }
 
+#[packet(Play, 0x13, Client)]
+pub struct PlayerAbilities {
+    pub flags: AbilityFlags,
+    pub flying_speed: f32,
+    pub walking_speed: f32,
+}
+
 #[packet(Play, 0x14, Client)]
 pub struct TabComplete<'a> {
     pub text: Cow<'a, str>,
@@ -152,4 +159,9 @@ pub struct ClientStatus {
     #[enum_as = "i32"]
     #[format = "varint"]
     pub action: ClientStatusAction,
+}
+
+#[packet(Play, 0x18, Client)]
+pub struct Spectate<'a> {
+    pub target: Cow<'a, str>,
 }

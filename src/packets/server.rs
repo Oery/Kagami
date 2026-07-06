@@ -168,6 +168,13 @@ pub struct EntityLook {
     pub on_ground: bool,
 }
 
+#[packet(Play, 0x1A, Server)]
+pub struct EntityStatus {
+    pub entity_id: i32,
+    #[enum_as = "u8"]
+    pub status: Status,
+}
+
 #[packet(Play, 0x1B, Server)]
 pub struct AttachEntity {
     pub entity_id: i32,

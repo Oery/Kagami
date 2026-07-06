@@ -194,7 +194,11 @@ impl AbilityFlags {
     }
 
     pub fn set_invulnerable(&mut self, value: bool) {
-        if value { self.0 |= 0x01; } else { self.0 &= !0x01; }
+        if value {
+            self.0 |= 0x01;
+        } else {
+            self.0 &= !0x01;
+        }
     }
 
     pub fn is_flying(&self) -> bool {
@@ -202,7 +206,11 @@ impl AbilityFlags {
     }
 
     pub fn set_flying(&mut self, value: bool) {
-        if value { self.0 |= 0x02; } else { self.0 &= !0x02; }
+        if value {
+            self.0 |= 0x02;
+        } else {
+            self.0 &= !0x02;
+        }
     }
 
     pub fn is_allow_flying(&self) -> bool {
@@ -210,7 +218,11 @@ impl AbilityFlags {
     }
 
     pub fn set_allow_flying(&mut self, value: bool) {
-        if value { self.0 |= 0x04; } else { self.0 &= !0x04; }
+        if value {
+            self.0 |= 0x04;
+        } else {
+            self.0 &= !0x04;
+        }
     }
 
     pub fn is_creative_mode(&self) -> bool {
@@ -218,7 +230,11 @@ impl AbilityFlags {
     }
 
     pub fn set_creative_mode(&mut self, value: bool) {
-        if value { self.0 |= 0x08; } else { self.0 &= !0x08; }
+        if value {
+            self.0 |= 0x08;
+        } else {
+            self.0 &= !0x08;
+        }
     }
 }
 
@@ -246,6 +262,31 @@ pub enum ClientStatusAction {
     Respawn,
     RequestStats,
     OpenInventory,
+}
+#[derive(Debug, Serializable)]
+pub enum Status {
+    ResetSpawnerTimer = 1,
+    Hurt,
+    Dead,
+    IronGolemArmsUp,
+    TamingParticles = 6,
+    TamedParticles,
+    ShakingWater,
+    EatingAccepted,
+    EatingGrass,
+    IronGolemRose,
+    VillagerHeartParticles,
+    VillagerAngryParticles,
+    VillagerHappyParticles,
+    WitchMagicParticles,
+    ZombieToVillager,
+    FireworkExplode,
+    InLoveParticles,
+    SquidResetRotation,
+    ExplosionParticles,
+    GuardianSound,
+    ReducedDebug,
+    NoReducedDebug,
 }
 
 // TODO: Use duration for fade
