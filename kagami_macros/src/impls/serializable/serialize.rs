@@ -56,6 +56,10 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
             raw_payload.write_all(&#field.to_be_bytes())?;
         },
 
+        "f64" => quote! {
+            raw_payload.write_all(&#field.to_be_bytes())?;
+        },
+
         "String" => match format {
             Format::Standard => quote! {
                 raw_payload.write_all(&crate::varint::temp_convert(#field.len() as i32)?)?;
@@ -103,6 +107,11 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
             },
             "f32" => quote! {
                 let value = #field.to_f32();
+                #data_ser
+                #field.serialize_enum(raw_payload)?;
+            },
+            "f64" => quote! {
+                let value = #field.to_f64();
                 #data_ser
                 #field.serialize_enum(raw_payload)?;
             },

@@ -169,6 +169,12 @@ pub fn get_serializable_enum_impl(item: &DeriveInput, data: &syn::DataEnum) -> T
 
                 val as f32
             }
+
+            pub fn to_f64(&self) -> f64 {
+                let val = self.to_i32();
+
+                val as f64
+            }
         }
     })
 }

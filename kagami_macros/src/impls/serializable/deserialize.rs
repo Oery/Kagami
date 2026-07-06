@@ -32,6 +32,7 @@ pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
     let data_de = match data_type.as_str() {
         "i16" => quote! { short(input)?; },
         "f32" => quote! { float(input)?; },
+        "f64" => quote! { double(input)?; },
         "Cow" => quote! { string(input)?; },
 
         "bool" => quote! {
