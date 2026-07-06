@@ -109,6 +109,11 @@ pub struct UpdateSign {
     pub line4: ChatComponent,
 }
 
+#[packet(Play, 0x14, Client)]
+pub struct TabComplete<'a> {
+    pub text: Cow<'a, str>,
+}
+
 #[packet(Play, 0x15, Client)]
 pub struct ClientSettings<'a> {
     pub locale: Cow<'a, str>,
