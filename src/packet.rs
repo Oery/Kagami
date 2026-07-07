@@ -80,6 +80,12 @@ pub fn string(input: &[u8]) -> IResult<&[u8], Cow<'_, str>> {
     Ok((input, Cow::from(string)))
 }
 
+pub fn byte_slice(input: &[u8]) -> IResult<&[u8], Cow<'_, [u8]>> {
+    let (input, length) = varint_i32(input)?;
+    let (input, content) = take(length as usize)(input)?;
+    Ok((input, Cow::Borrowed(content)))
+}
+
 // TODO: Handle that unwrap
 pub fn json<T: DeserializeOwned>(input: &[u8]) -> IResult<&[u8], T> {
     let (input, json) = string(input)?;
@@ -168,6 +174,19 @@ impl<'a> Serializable<'a> for std::borrow::Cow<'a, str> {
 
     fn deserialize(input: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
         string(input)
+    }
+}
+
+impl<'a> Serializable<'a> for std::borrow::Cow<'a, [u8]> {
+    fn serialize(&self, payload: &mut Vec<u8>) -> PResult<()> {
+        payload.write_all(&crate::varint::temp_convert(self.len() as i32)?)?;
+        payload.write_all(self.as_ref())?;
+
+        Ok(())
+    }
+
+    fn deserialize(input: &'a [u8]) -> nom::IResult<&'a [u8], Self> {
+        byte_slice(input)
     }
 }
 

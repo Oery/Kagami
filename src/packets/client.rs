@@ -161,6 +161,12 @@ pub struct ClientStatus {
     pub action: ClientStatusAction,
 }
 
+#[packet(Play, 0x17, Client)]
+pub struct PluginMessage<'a> {
+    pub channel: Cow<'a, str>,
+    pub data: Cow<'a, [u8]>,
+}
+
 #[packet(Play, 0x18, Client)]
 pub struct Spectate<'a> {
     pub target: Cow<'a, str>,

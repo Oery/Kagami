@@ -33,7 +33,6 @@ pub fn get_deser_fn(field: &Field) -> proc_macro2::TokenStream {
         "i16" => quote! { short(input)?; },
         "f32" => quote! { float(input)?; },
         "f64" => quote! { double(input)?; },
-        "Cow" => quote! { string(input)?; },
 
         "bool" => quote! {
             nom::bytes::streaming::take(1usize)(input)?;

@@ -68,11 +68,6 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
             _ => panic!("Unsupported format"),
         },
 
-        "Cow" => quote! {
-            raw_payload.write_all(&crate::varint::temp_convert(#field.len() as i32)?)?;
-            raw_payload.write_all(#field.as_bytes())?;
-        },
-
         _ => match format {
             Format::Json => quote! {
                 let j = serde_json::to_string(&#field).unwrap();
