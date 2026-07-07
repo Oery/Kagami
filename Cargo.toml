@@ -11,7 +11,7 @@ license = "MIT"
 
 [workspace]
 members = [
-    ".",
+    ".", "kagami-nbt",
     "kagami_macros",
 ]
 
@@ -28,6 +28,7 @@ flate2 = "1.1.2"
 serde_json = "1.0.145"
 
 kagami_macros = { version = "0.1.0", path = "./kagami_macros/" }
+kagami-nbt = { version = "0.1.0", path = "./kagami-nbt/" }
 
 [build-dependencies]
 proc-macro2 = "1.0.106"

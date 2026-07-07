@@ -407,6 +407,7 @@ dependencies = [
  "atomic_enum",
  "flate2",
  "futures",
+ "kagami-nbt",
  "kagami_macros",
  "nom",
  "proc-macro2",
@@ -417,6 +418,14 @@ dependencies = [
  "syn 2.0.114",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "kagami-nbt"
+version = "0.1.0"
+dependencies = [
+ "nom",
+ "thiserror",
 ]
 
 [[package]]

@@ -11,6 +11,7 @@ use crate::packet::*;
 use crate::packets::data::*;
 use crate::packets::item::Item;
 use crate::packets::json::*;
+use crate::packets::nbt::Nbt;
 use crate::traits::*;
 
 // TODO: Check if response can be zero copied
@@ -340,4 +341,11 @@ pub struct PlayerListHeaderAndFooter {
 pub struct ResourcePackSend<'a> {
     pub url: Cow<'a, str>,
     pub hash: Cow<'a, str>,
+}
+
+#[packet(Play, 0x49, Server)]
+pub struct UpdateEntityNBT {
+    #[format = "varint"]
+    pub entity_id: i32,
+    pub nbt: Nbt,
 }
