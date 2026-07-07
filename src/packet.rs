@@ -21,7 +21,7 @@ pub struct Packet<'a> {
 
 pub fn int(input: &[u8]) -> IResult<&[u8], i32> {
     let (input, bytes) = take(4_usize)(input)?;
-    let val = i32::from_le_bytes(bytes.try_into().unwrap());
+    let val = i32::from_be_bytes(bytes.try_into().unwrap());
 
     Ok((input, val))
 }

@@ -44,7 +44,7 @@ pub fn get_ser_fn(field: &Field, is_struct_field: bool) -> proc_macro2::TokenStr
 
         "i32" => match format {
             Format::Standard => {
-                quote! { raw_payload.write_all(&#field.to_le_bytes())?; }
+                quote! { raw_payload.write_all(&#field.to_be_bytes())?; }
             }
             Format::VarInt => {
                 quote! { raw_payload.write_all(&crate::varint::temp_convert(#field_own)?)?; }
