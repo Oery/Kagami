@@ -23,3 +23,7 @@ uuid = "1.26.1"
 [[bench]]
 name = "loopback"
 harness = false
+
+[[bench]]
+name = "micro"
+harness = false

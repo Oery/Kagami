@@ -112,18 +112,24 @@ async fn accept_forever<S: 'static, H: Handlers<S> + 'static>(
     }
 }
 
-/// Builds handlers' context outside a proxy, for tests of handler chains.
+/// Pieces of the proxy for tests and benchmarks outside this crate.
 #[doc(hidden)]
 pub mod testing {
+    use std::cell::RefCell;
+    use std::io;
     use std::rc::Rc;
 
     use glommio::net::{TcpListener, TcpStream};
+    use mc_protocol::Direction;
 
-    use crate::handlers::Context;
+    use crate::handlers::{Context, Handlers};
     use crate::outlet::{Client, Outlet, Server};
+    use crate::pump::Pump;
     use crate::session::{Session, Shared};
     use crate::split::split;
     use crate::stream::Writer;
+
+    pub use crate::cipher::{Decryptor, Encryptor, ciphers};
 
     /// A session over `state` whose sockets nobody reads. Call it inside a
     /// Glommio executor.
@@ -137,6 +143,28 @@ pub mod testing {
     /// Runs `f` with the context handlers get in `session`.
     pub fn with_context<S, R>(session: &Session<S>, f: impl FnOnce(&mut Context<'_, S>) -> R) -> R {
         session.with_context(f)
+    }
+
+    /// A pump that walks frames without writing them, to measure what it
+    /// costs per frame.
+    pub struct Scanner<S, H> {
+        pump: Pump<S, H>,
+    }
+
+    impl<S, H: Handlers<S>> Scanner<S, H> {
+        /// A pump in configuration state. Call it inside a Glommio executor.
+        pub async fn new(direction: Direction, compressed: bool, state: S, handlers: H) -> Self {
+            let session = session(state).await;
+            let pump = Pump::new(direction, compressed, Rc::new(RefCell::new(handlers)), session);
+
+            Self { pump }
+        }
+
+        /// Runs the pump over the complete frames of `bytes`, handlers
+        /// included, as if every write went out at once.
+        pub fn scan(&mut self, bytes: &[u8]) -> io::Result<()> {
+            self.pump.scan_without_writing(bytes)
+        }
     }
 
     async fn outlet() -> Rc<Outlet> {

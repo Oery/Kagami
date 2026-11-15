@@ -42,7 +42,7 @@ pub struct Pump<S, H> {
 
 /// What to write for the frames at the start of the buffer.
 #[derive(Debug, PartialEq, Eq)]
-struct Step {
+pub struct Step {
     /// Bytes to write as they were read.
     run: usize,
     /// Bytes after the run that are consumed without being written: a frame
@@ -99,6 +99,22 @@ impl<S, H: Handlers<S>> Pump<S, H> {
         }
     }
 
+    /// Walks every complete frame of `bytes` as `forward` does, discarding
+    /// what it would write. For benchmarks.
+    pub fn scan_without_writing(&mut self, bytes: &[u8]) -> io::Result<()> {
+        let mut start = 0;
+
+        loop {
+            let step = self.scan(&bytes[start..])?;
+            if step.run == 0 && step.skipped == 0 {
+                return Ok(());
+            }
+
+            start += step.run + step.skipped;
+            self.tail.clear();
+        }
+    }
+
     /// The socket this pump writes to.
     pub fn target(&self) -> &Outlet {
         target(self.direction, &self.session)
@@ -107,7 +123,7 @@ impl<S, H: Handlers<S>> Pump<S, H> {
     /// Walks the complete frames at the start of `bytes`, running handlers on
     /// the frames they want, and stops where something must be written:
     /// after a frame whose handlers changed its fate or sent packets.
-    fn scan(&mut self, bytes: &[u8]) -> io::Result<Step> {
+    pub fn scan(&mut self, bytes: &[u8]) -> io::Result<Step> {
         self.refresh_interest();
         let mut run = 0;
 

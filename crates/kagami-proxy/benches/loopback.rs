@@ -1,7 +1,8 @@
 //! End-to-end loopback benchmark: a client talks to a minimal server, once
 //! directly and once through the proxy, and compares throughput and round
 //! trip latency. The server runs plain, compressed, and online: encrypted
-//! and compressed, without the Mojang session check.
+//! and compressed, without the Mojang session check. The micro benchmark
+//! measures the cipher and inflating on their own.
 //!
 //! cargo bench -p kagami-proxy --bench loopback
 
@@ -135,17 +136,6 @@ fn main() {
                 println!("{label:<30}{direct:>11.1} µs{proxied:>11.1} µs");
             }
         }
-
-        // What an uncompressed client leg would cost on top: inflating every
-        // compressed packet from the server.
-        let label = format!("inflating every {LARGE_BODY} B packet");
-        println!("{label:<30}{:>9.2} GiB/s", inflate_rate(LARGE_BODY));
-
-        // The online server leg: the proxy decrypts what the server sends and
-        // encrypts what the client sends.
-        let (encrypted, decrypted) = cipher_rates();
-        println!("{:<30}{encrypted:>9.2} GiB/s", "AES-CFB8 encrypting");
-        println!("{:<30}{decrypted:>9.2} GiB/s", "AES-CFB8 decrypting");
     });
 }
 
@@ -475,42 +465,6 @@ fn parse_scenario(packet: &[u8]) -> Scenario {
         0 => Scenario::Stream { body_len: u32::from_be_bytes(payload[1..5].try_into().unwrap()) as usize },
         _ => Scenario::Echo,
     }
-}
-
-/// How fast one thread inflates the packets of a compressed large stream.
-fn inflate_rate(body_len: usize) -> f64 {
-    let frame = wire_frame(BULK_ID, &payload(body_len), Some(COMPRESSION_THRESHOLD));
-    let mut data = &frame[..];
-    VarInt::read(&mut data).unwrap();
-    VarInt::read(&mut data).unwrap();
-
-    let frames = frame_count(body_len) / 4;
-    let mut packet = Vec::with_capacity(body_len + 8);
-    let started = Instant::now();
-
-    for _ in 0..frames {
-        packet.clear();
-        ZlibDecoder::new(data).read_to_end(&mut packet).unwrap();
-    }
-
-    (frames * body_len) as f64 / started.elapsed().as_secs_f64() / (1u64 << 30) as f64
-}
-
-/// How fast one thread encrypts and decrypts in place, in GiB/s.
-fn cipher_rates() -> (f64, f64) {
-    let secret = [7; 16];
-    let mut bytes = payload(64 * 1024 * 1024);
-    let gibibytes = bytes.len() as f64 / (1u64 << 30) as f64;
-
-    let started = Instant::now();
-    Encryptor::new(&secret.into(), &secret.into()).encrypt(&mut bytes);
-    let encrypted = gibibytes / started.elapsed().as_secs_f64();
-
-    let started = Instant::now();
-    Decryptor::new(&secret.into(), &secret.into()).decrypt(&mut bytes);
-    let decrypted = gibibytes / started.elapsed().as_secs_f64();
-
-    (encrypted, decrypted)
 }
 
 fn start_server(wire: Wire) -> SocketAddr {
