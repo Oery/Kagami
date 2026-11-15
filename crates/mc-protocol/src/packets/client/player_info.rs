@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use mc_protocol_macros::IntoOwned;
 use uuid::Uuid;
 
-use crate::decode::Result as DecodeResult;
+use crate::decode::{MAX_COLLECTION_LEN, Result as DecodeResult, read_length};
 use crate::encode::Result as EncodeResult;
 use crate::error::EncodeError;
 use crate::packets::{PacketWriter, Payload};
@@ -204,7 +204,7 @@ impl<'p> Payload<'p> for PlayerInfoUpdate<'p> {
 
     fn decode_payload(buf: &mut &'p [u8]) -> DecodeResult<Self> {
         let actions = u8::read(buf)?;
-        let count = crate::decode::read_length(buf, crate::decode::MAX_COLLECTION_LEN)?;
+        let count = read_length(buf, MAX_COLLECTION_LEN)?;
         let mut entries = Vec::new();
 
         for _ in 0..count {
