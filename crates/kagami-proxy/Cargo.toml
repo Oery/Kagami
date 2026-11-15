@@ -7,6 +7,7 @@ license.workspace = true
 autotests = false
 
 [dependencies]
+flate2 = { version = "1.1.11", default-features = false, features = ["zlib-rs"] }
 futures-lite = "2.6.1"
 glommio = { package = "glommio-ng", version = "0.12" }
 mc_protocol = { path = "../mc-protocol" }

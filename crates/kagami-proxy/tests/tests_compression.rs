@@ -1,0 +1,53 @@
+use std::io::Write;
+
+use flate2::Compression;
+use flate2::write::ZlibEncoder;
+
+use super::*;
+
+/// A compressed frame body: the uncompressed length, then the zlib data.
+fn compressed_body(packet: &[u8]) -> Vec<u8> {
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(packet).unwrap();
+    let data = encoder.finish().unwrap();
+
+    let mut body = Vec::new();
+    VarInt(packet.len() as i32).encode(&mut body).unwrap();
+    body.extend_from_slice(&data);
+
+    body
+}
+
+#[test]
+fn ids_are_read_from_uncompressed_and_compressed_bodies() {
+    let mut inflater = Inflater::new();
+    assert_eq!(inflater.packet_id(&[0, 0x2e, 1, 2]).unwrap(), 0x2e);
+
+    let mut packet = vec![0x80, 0x01];
+    packet.extend(std::iter::repeat_n(7, 1000));
+    assert_eq!(inflater.packet_id(&compressed_body(&packet)).unwrap(), 128);
+    // The stream is reset between frames.
+    assert_eq!(inflater.packet_id(&compressed_body(&[0x03])).unwrap(), 0x03);
+}
+
+#[test]
+fn packets_are_borrowed_when_uncompressed_and_inflated_otherwise() {
+    let mut inflater = Inflater::new();
+    let mut inflated = Vec::new();
+    assert_eq!(inflater.packet(&[0, 0x2e, 1], &mut inflated).unwrap(), [0x2e, 1]);
+
+    let packet: Vec<u8> = (0..=255).collect();
+    let body = compressed_body(&packet);
+    assert_eq!(inflater.packet(&body, &mut inflated).unwrap(), packet);
+
+    let mut wrong_length = body.clone();
+    wrong_length[0] = 0x7f;
+    assert!(inflater.packet(&wrong_length, &mut inflated).is_err());
+}
+
+#[test]
+fn proxy_packets_are_framed_uncompressed() {
+    let mut frame = vec![2, 0x2e, 9];
+    add_zero_data_length(&mut frame).unwrap();
+    assert_eq!(frame, [3, 0, 0x2e, 9]);
+}

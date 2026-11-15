@@ -5,6 +5,7 @@
 //! by packet, and then forwards configuration and play frames unchanged.
 //! Linux only: it runs on Glommio's io_uring executor, on one thread.
 
+mod compression;
 mod connection;
 mod frame;
 mod pump;

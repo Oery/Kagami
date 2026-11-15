@@ -1,5 +1,9 @@
 //! One client's session: the proxy answers the handshake, relays status and
 //! login packet by packet, then pumps configuration and play.
+//!
+//! Compression is mirrored: when the server enables it, the proxy forwards
+//! the same threshold to the client, so frames pass through both legs
+//! unchanged.
 
 use std::io;
 
@@ -15,7 +19,7 @@ use crate::Upstream;
 use crate::connection::Connection;
 use crate::frame::FrameBuffer;
 use crate::invalid_data;
-use crate::pump::pump;
+use crate::pump::{Wire, pump};
 use crate::split::{ReadHalf, WriteHalf};
 
 /// Serves one client connection until either side closes it.
@@ -64,6 +68,7 @@ async fn login(client: &mut Connection, server: &mut Connection) -> io::Result<b
     let Some(Serverbound::LoginStart(login_start)) = client.read_serverbound(State::Login).await? else {
         return Err(invalid_data("expected login start"));
     };
+
     server.send(|out| login_start.encode(out)).await?;
 
     loop {
@@ -91,9 +96,11 @@ async fn login(client: &mut Connection, server: &mut Connection) -> io::Result<b
             Clientbound::EncryptionRequest(_) => {
                 return refuse(client, "Kagami does not support online-mode servers yet").await;
             }
-            Clientbound::SetCompression(_) => {
-                let reason = "Kagami does not support compression yet: set network-compression-threshold=-1 on the server";
-                return refuse(client, reason).await;
+            Clientbound::SetCompression(compression) => {
+                client.send(|out| compression.encode(out)).await?;
+
+                client.set_compression(compression.threshold);
+                server.set_compression(compression.threshold);
             }
             _ => return Err(invalid_data("unexpected login packet")),
         }
@@ -138,11 +145,15 @@ async fn forward_clientbound(server: &mut Connection, client: &mut Connection, s
 
 /// Pumps both directions, starting in configuration, until both have ended.
 async fn pump_both(client: Connection, server: Connection) -> io::Result<()> {
-    let (client_reader, client_writer, client_buffer) = client.into_parts();
-    let (server_reader, server_writer, server_buffer) = server.into_parts();
+    let client = client.into_parts();
+    let server = server.into_parts();
+    debug_assert_eq!(client.compressed, server.compressed, "compression is mirrored");
 
-    let to_server = pump_until_closed(Direction::Serverbound, client_buffer, client_reader, server_writer);
-    let to_client = pump_until_closed(Direction::Clientbound, server_buffer, server_reader, client_writer);
+    let to_server = Wire { direction: Direction::Serverbound, compressed: client.compressed };
+    let to_client = Wire { direction: Direction::Clientbound, compressed: server.compressed };
+
+    let to_server = pump_until_closed(to_server, client.buffer, client.reader, server.writer);
+    let to_client = pump_until_closed(to_client, server.buffer, server.reader, client.writer);
     let (to_server, to_client) = zip(to_server, to_client).await;
 
     to_server.and(to_client)
@@ -151,8 +162,9 @@ async fn pump_both(client: Connection, server: Connection) -> io::Result<()> {
 /// When one direction ends, it closes the socket it was writing to. That
 /// ends the other direction's read on the same socket, so no read is ever
 /// cancelled mid-flight.
-async fn pump_until_closed(direction: Direction, mut buffer: FrameBuffer, mut reader: ReadHalf, mut writer: WriteHalf) -> io::Result<()> {
-    let pumped = pump(direction, State::Config, &mut buffer, &mut reader, &mut writer).await;
+async fn pump_until_closed(wire: Wire, mut buffer: FrameBuffer, mut reader: ReadHalf, mut writer: WriteHalf) -> io::Result<()> {
+    let pumped = pump(wire, State::Config, &mut buffer, &mut reader, &mut writer).await;
+
     // The peer may already be gone; the pump's own result is what matters.
     let _ = writer.shutdown().await;
 
