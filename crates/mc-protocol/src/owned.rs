@@ -68,4 +68,4 @@ macro_rules! already_owned {
     };
 }
 
-already_owned!(bool, u8, i8, u16, i16, i32, i64, f32, f64, String, Uuid, crate::VarInt);
+already_owned!(bool, u8, i8, u16, i16, i32, i64, f32, f64, String, Uuid, crate::VarInt, crate::types::VarLong);

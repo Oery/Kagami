@@ -98,21 +98,8 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
                 quote!(::mc_protocol::PacketWriter::encode(&self.#ident, out)?;),
                 quote!(::mc_protocol::PacketWriter::body_len(&self.#ident)),
             ),
-            Format::VarInt => {
-                // i32 needs no fallible conversion; other integer fields retain
-                // their checked conversion from the signed wire value.
-                let read = quote!(<::mc_protocol::VarInt as ::mc_protocol::PacketWriter>::read(buf)?.0);
-                let value = match ty {
-                    Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "i32") => read,
-                    _ => quote!(#read.try_into()?),
-                };
-                let varint = quote!(::mc_protocol::VarInt(self.#ident as i32));
-                (
-                    quote!(let #ident: #ty = #value;),
-                    quote!(::mc_protocol::PacketWriter::encode(&#varint, out)?;),
-                    quote!(::mc_protocol::PacketWriter::body_len(&#varint)),
-                )
-            }
+            Format::VarInt => variable_length(ident, ty, quote!(::mc_protocol::VarInt), quote!(i32)),
+            Format::VarLong => variable_length(ident, ty, quote!(::mc_protocol::types::VarLong), quote!(i64)),
         };
         decodes.push(decode);
         encodes.push(encode);
@@ -154,6 +141,27 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
 
         #into_owned
     })
+}
+
+/// The codec of a field sent as a VarInt or VarLong: `wrapper` is the
+/// codec type and `wire` the integer it holds.
+fn variable_length(ident: &Option<syn::Ident>, ty: &Type, wrapper: Tokens, wire: Tokens) -> (Tokens, Tokens, Tokens) {
+    // A field of the wire type needs no fallible conversion; other integer
+    // fields keep their checked conversion from the signed wire value.
+    let read = quote!(<#wrapper as ::mc_protocol::PacketWriter>::read(buf)?.0);
+    let wire_name = wire.to_string();
+    let is_wire_type = match ty {
+        Type::Path(path) => path.path.segments.last().is_some_and(|segment| segment.ident == wire_name),
+        _ => false,
+    };
+    let value = if is_wire_type { read } else { quote!(#read.try_into()?) };
+
+    let encoded = quote!(#wrapper(self.#ident as #wire));
+    let decode = quote!(let #ident: #ty = #value;);
+    let encode = quote!(::mc_protocol::PacketWriter::encode(&#encoded, out)?;);
+    let length = quote!(::mc_protocol::PacketWriter::body_len(&#encoded));
+
+    (decode, encode, length)
 }
 
 /// `#[format]` only steers the generated codec; the struct itself must not keep it.

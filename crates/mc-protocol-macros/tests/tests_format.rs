@@ -19,4 +19,5 @@ fn unknown_duplicate_and_malformed_formats_are_rejected() {
     }
 
     assert!(matches!(Format::parse(&[]).unwrap(), Format::Standard));
+    assert!(matches!(Format::parse(&[syn::parse_quote!(#[format = "varlong"])]).unwrap(), Format::VarLong));
 }

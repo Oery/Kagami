@@ -184,6 +184,37 @@ impl<'p> PacketWriter<'p> for Nbt<'p> {
     }
 }
 
+/// Network NBT that may be absent, sent as a lone `TAG_End`.
+#[derive(Debug, Clone, PartialEq, IntoOwned)]
+pub struct OptionalNbt<'p>(pub Option<Nbt<'p>>);
+
+impl<'p> PacketWriter<'p> for OptionalNbt<'p> {
+    fn read(input: &mut &'p [u8]) -> Result<Self, DecodeError> {
+        let tag = u8::read(input)?;
+        if tag == 0 {
+            return Ok(Self(None));
+        }
+
+        let value = read_payload(input, tag, 0)?;
+
+        Ok(Self(Some(value)))
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        match &self.0 {
+            Some(value) => value.encode(out),
+            None => 0u8.encode(out),
+        }
+    }
+
+    fn body_len(&self) -> usize {
+        match &self.0 {
+            Some(value) => value.body_len(),
+            None => 1,
+        }
+    }
+}
+
 fn read_payload<'p>(input: &mut &'p [u8], tag: u8, depth: usize) -> DecodeResult<Nbt<'p>> {
     if depth > MAX_DEPTH {
         return Err(DecodeError::InvalidLength);

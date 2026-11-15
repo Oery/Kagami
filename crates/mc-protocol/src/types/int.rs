@@ -47,6 +47,21 @@ impl PacketWriter<'_> for i16 {
     }
 }
 
+impl PacketWriter<'_> for i8 {
+    fn read(input: &mut &[u8]) -> Result<Self, DecodeError> {
+        Ok(i8::from_be_bytes(take_array(input)?))
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.extend_from_slice(&self.to_be_bytes());
+        Ok(())
+    }
+
+    fn body_len(&self) -> usize {
+        1
+    }
+}
+
 impl PacketWriter<'_> for f32 {
     fn read(input: &mut &[u8]) -> Result<Self, DecodeError> {
         Ok(f32::from_be_bytes(take_array(input)?))
