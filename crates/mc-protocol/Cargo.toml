@@ -1,0 +1,17 @@
+[package]
+name = "mc_protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.21"
+futures-lite = "2.6.1"
+
+mc-protocol-macros = { version = "0.1.0", path = "../mc-protocol-macros" }
+uuid = { version = "1.26.1", features = ["v4"] }
+
+[lib]
+path = "src/lib.rs"

@@ -1,0 +1,16 @@
+# Ignore files by default.
+*
+!*/
+
+# Workspace
+!/.gitignore
+!/Cargo.toml
+!/Cargo.lock
+!/rustfmt.toml
+
+# Crates
+!/crates/*/Cargo.toml
+!*.rs
+
+# Build
+/target/
