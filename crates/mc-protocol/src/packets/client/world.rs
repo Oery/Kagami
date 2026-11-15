@@ -7,8 +7,7 @@ use mc_protocol_macros::{IntoOwned, packet};
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::packets::PacketWriter;
-use crate::types::bytes::Remainder;
-use crate::types::{LightData, Nbt, VarInt, VarLong, Vec3};
+use crate::types::{IdOr, LightData, Nbt, Particle, SoundEvent, VarInt, VarLong, Vec3};
 
 /// `Difficulty` ordinals.
 pub mod difficulty {
@@ -95,9 +94,20 @@ pub struct Explosion<'p> {
     pub block_count: i32,
     /// Velocity added to this client's player.
     pub player_knockback: Option<Vec3>,
-    /// The explosion particle, its sound, the weighted block particles and
-    /// whether the sound plays; not decoded.
-    pub effects: Remainder<'p>,
+    pub explosion_particle: Particle<'p>,
+    pub explosion_sound: IdOr<SoundEvent<'p>>,
+    /// Particles around the blown up blocks, one picked by weight each time.
+    pub block_particles: Vec<ExplosionParticle<'p>>,
+    pub play_sound: bool,
+}
+
+#[derive(Debug, PacketWriter, IntoOwned)]
+pub struct ExplosionParticle<'p> {
+    pub particle: Particle<'p>,
+    pub scaling: f32,
+    pub speed: f32,
+    #[format = "varint"]
+    pub weight: i32,
 }
 
 #[packet(Play, 0x2C, Clientbound)]

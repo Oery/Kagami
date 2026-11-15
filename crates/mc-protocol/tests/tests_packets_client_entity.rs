@@ -106,3 +106,24 @@ fn angles_wrap_and_quantize_negative_and_large_degrees() {
 fn collect_packet_uses_varint_ids() {
     assert_eq!(frame(&TakeItemEntity { item_id: 5, collector_id: 128, amount: 2 }), [5, 0x7F, 5, 0x80, 0x01, 2]);
 }
+
+#[test]
+fn equipment_sets_the_top_bit_of_every_slot_but_the_last() {
+    // Entity 1: an empty main hand, then a stack of item 5 on the head.
+    let payload: &'static [u8] = &[1, 0x80, 0, equipment_slot::HEAD, 1, 5, 0, 0];
+
+    let mut input = payload;
+    let packet = SetEquipment::decode_payload(&mut input).unwrap();
+    assert!(input.is_empty());
+
+    let slots: Vec<u8> = packet.equipment.0.iter().map(|piece| piece.slot).collect();
+    assert_eq!(slots, [equipment_slot::MAIN_HAND, equipment_slot::HEAD]);
+    assert_eq!(&frame(&packet)[2..], payload);
+}
+
+#[test]
+fn equipment_without_a_piece_does_not_encode() {
+    let packet = SetEquipment { entity_id: 1, equipment: EquipmentList(Vec::new()) };
+
+    assert!(packet.encode(&mut Vec::new()).is_err());
+}

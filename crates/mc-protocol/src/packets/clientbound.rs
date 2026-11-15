@@ -66,7 +66,7 @@ pub enum Clientbound<'p> {
     PlayKeepAlive(PlayKeepAlive),
     ChunkData(ChunkData<'p>),
     WorldEvent(WorldEvent),
-    LevelParticles(LevelParticles),
+    LevelParticles(LevelParticles<'p>),
     PlayLogin(PlayLogin<'p>),
     LowDiskSpaceWarning(LowDiskSpaceWarning),
     MoveEntityPosition(MoveEntityPosition),

@@ -6,7 +6,7 @@ use mc_protocol_macros::{IntoOwned, packet};
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::packets::{PacketWriter, Payload};
-use crate::types::VarInt;
+use crate::types::{Particle, VarInt};
 use crate::{Direction, State};
 
 /// `InteractionHand` ordinals; distinct from the configured dominant arm.
@@ -167,7 +167,8 @@ impl<'p> Payload<'p> for StopSound<'p> {
     }
 }
 
-/// `minecraft:particle_type` IDs of data-less particles, from 26.3 registration order.
+/// `minecraft:particle_type` IDs of common particles, from 26.3 registration order.
+/// Those carrying options are all in [`particle_type`](crate::types::particle::particle_type).
 pub mod particle {
     /// Verified against the official 26.3 PARTICLE_TYPE registry.
     pub const NOTE: i32 = 68;
@@ -179,11 +180,9 @@ pub mod particle {
     pub const ENTITY_EFFECT: i32 = 28;
 }
 
-/// Level Particles for particle types without options; their data is empty.
 #[packet(Play, 0x30, Clientbound)]
-pub struct LevelParticles {
-    #[format = "varint"]
-    pub particle: i32,
+pub struct LevelParticles<'p> {
+    pub particle: Particle<'p>,
     pub override_limiter: bool,
     pub always_visible: bool,
     pub x: f64,

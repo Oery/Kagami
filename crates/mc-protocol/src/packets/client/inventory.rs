@@ -1,8 +1,8 @@
 //! Clientbound containers, items, trades and recipes for protocol 777.
 //!
-//! Item stacks (Slot), recipe displays and slot displays are not decoded:
-//! their components have no length prefix, so a packet keeps everything
-//! from the first of them on as raw bytes, which re-encode unchanged.
+//! Recipe displays and slot displays are not decoded: a packet keeps
+//! everything from the first of them on as raw bytes, which re-encode
+//! unchanged.
 use std::borrow::Cow;
 
 use mc_protocol_macros::{IntoOwned, packet};
@@ -10,8 +10,9 @@ use mc_protocol_macros::{IntoOwned, packet};
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::packets::PacketWriter;
-use crate::types::VarInt;
 use crate::types::bytes::Remainder;
+use crate::types::item::Component;
+use crate::types::{Slot, VarInt};
 
 /// Replaces every slot of a window.
 #[packet(Play, 0x12, Clientbound)]
@@ -20,8 +21,9 @@ pub struct SetContainerContent<'p> {
     pub window_id: i32,
     #[format = "varint"]
     pub state_id: i32,
-    /// The prefixed array of slots, then the carried slot; not decoded.
-    pub slots: Remainder<'p>,
+    pub slots: Vec<Slot<'p>>,
+    /// The stack under the mouse.
+    pub carried: Slot<'p>,
 }
 
 /// A window-specific value, such as furnace progress or an enchantment cost.
@@ -40,15 +42,13 @@ pub struct SetContainerSlot<'p> {
     #[format = "varint"]
     pub state_id: i32,
     pub slot: i16,
-    /// The slot's item stack; not decoded.
-    pub item: Remainder<'p>,
+    pub item: Slot<'p>,
 }
 
 /// The item stack under the mouse in an open window.
 #[packet(Play, 0x62, Clientbound)]
 pub struct SetCursorItem<'p> {
-    /// The item stack; not decoded.
-    pub item: Remainder<'p>,
+    pub item: Slot<'p>,
 }
 
 /// Uses player inventory indices, not those of any window.
@@ -56,8 +56,7 @@ pub struct SetCursorItem<'p> {
 pub struct SetPlayerInventorySlot<'p> {
     #[format = "varint"]
     pub slot: i32,
-    /// The item stack; not decoded.
-    pub item: Remainder<'p>,
+    pub item: Slot<'p>,
 }
 
 /// `group` is an item identifier or a `use_cooldown` group; zero ticks clear it.
@@ -82,8 +81,37 @@ pub struct OpenHorseScreen {
 pub struct MerchantOffers<'p> {
     #[format = "varint"]
     pub window_id: i32,
-    /// The trades, then the villager's level, experience and flags; not decoded.
-    pub offers: Remainder<'p>,
+    pub offers: Vec<MerchantOffer<'p>>,
+    #[format = "varint"]
+    pub villager_level: i32,
+    #[format = "varint"]
+    pub villager_xp: i32,
+    pub show_progress: bool,
+    pub can_restock: bool,
+}
+
+#[derive(Debug, PacketWriter, IntoOwned)]
+pub struct MerchantOffer<'p> {
+    pub cost_a: ItemCost<'p>,
+    pub result: Slot<'p>,
+    pub cost_b: Option<ItemCost<'p>>,
+    pub out_of_stock: bool,
+    pub uses: i32,
+    pub max_uses: i32,
+    pub xp: i32,
+    pub special_price_diff: i32,
+    pub price_multiplier: f32,
+    pub demand: i32,
+}
+
+/// Items a trade asks for: the components listed must match exactly.
+#[derive(Debug, PacketWriter, IntoOwned)]
+pub struct ItemCost<'p> {
+    #[format = "varint"]
+    pub item: i32,
+    #[format = "varint"]
+    pub count: i32,
+    pub components: Vec<Component<'p>>,
 }
 
 /// Opens the written book in the given [`InteractionHand`](super::InteractionHand).

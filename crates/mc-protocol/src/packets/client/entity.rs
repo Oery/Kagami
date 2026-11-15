@@ -7,8 +7,7 @@ use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::error::EncodeError;
 use crate::packets::PacketWriter;
-use crate::types::bytes::Remainder;
-use crate::types::{LpVec3, VarInt, Vec3};
+use crate::types::{EntityMetadata, LpVec3, Slot, VarInt, Vec3};
 
 /// `data` is type-specific: falling blocks carry their block state; items and
 /// players carry zero.
@@ -271,9 +270,7 @@ pub struct PlayerInfoRemove {
 pub struct SetEntityMetadata<'p> {
     #[format = "varint"]
     pub entity_id: i32,
-    /// The metadata entries up to the 0xFF terminator; not decoded, since
-    /// values include item stacks and particles.
-    pub metadata: Remainder<'p>,
+    pub metadata: EntityMetadata<'p>,
 }
 
 /// `EquipmentSlot` ordinals in Set Equipment.
@@ -292,9 +289,62 @@ pub mod equipment_slot {
 pub struct SetEquipment<'p> {
     #[format = "varint"]
     pub entity_id: i32,
-    /// Pairs of an [`equipment_slot`] byte, with the top bit set when
-    /// another pair follows, and an item stack; not decoded.
-    pub equipment: Remainder<'p>,
+    pub equipment: EquipmentList<'p>,
+}
+
+#[derive(Debug, IntoOwned)]
+pub struct Equipment<'p> {
+    /// An [`equipment_slot`].
+    pub slot: u8,
+    pub item: Slot<'p>,
+}
+
+/// At least one piece of equipment. On the wire, each slot byte has its top
+/// bit set when another piece follows.
+#[derive(Debug, IntoOwned)]
+pub struct EquipmentList<'p>(pub Vec<Equipment<'p>>);
+
+const ANOTHER_PIECE_FOLLOWS: u8 = 0x80;
+
+impl<'p> PacketWriter<'p> for EquipmentList<'p> {
+    fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
+        let mut pieces = Vec::new();
+
+        loop {
+            let slot_byte = u8::read(input)?;
+            let item = Slot::read(input)?;
+
+            pieces.push(Equipment { slot: slot_byte & !ANOTHER_PIECE_FOLLOWS, item });
+
+            if slot_byte & ANOTHER_PIECE_FOLLOWS == 0 {
+                break;
+            }
+        }
+
+        Ok(Self(pieces))
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        let Some(last) = self.0.len().checked_sub(1) else {
+            return Err(EncodeError::InvalidLength);
+        };
+
+        for (index, piece) in self.0.iter().enumerate() {
+            let mut slot_byte = piece.slot;
+            if index != last {
+                slot_byte |= ANOTHER_PIECE_FOLLOWS;
+            }
+
+            slot_byte.encode(out)?;
+            piece.item.encode(out)?;
+        }
+
+        Ok(())
+    }
+
+    fn body_len(&self) -> usize {
+        self.0.iter().map(|piece| 1 + piece.item.body_len()).sum()
+    }
 }
 
 /// A lead between two entities; a holder of -1 detaches it.

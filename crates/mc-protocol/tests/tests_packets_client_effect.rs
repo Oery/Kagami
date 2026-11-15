@@ -1,4 +1,5 @@
 use super::*;
+use crate::types::particle::{ParticleOptions, particle_type};
 use std::borrow::Cow;
 
 fn encode<'p>(packet: &impl Payload<'p>) -> Vec<u8> {
@@ -74,10 +75,9 @@ fn stop_sound_flags_control_optional_fields_and_frame_lengths() {
     }
 }
 
-#[test]
-fn level_particles_put_the_particle_type_first() {
-    let packet = LevelParticles {
-        particle: particle::SWEEP_ATTACK,
+fn level_particles(particle: Particle<'_>) -> LevelParticles<'_> {
+    LevelParticles {
+        particle,
         override_limiter: false,
         always_visible: false,
         x: 0.0,
@@ -91,11 +91,27 @@ fn level_particles_put_the_particle_type_first() {
         speed_z: 0.0,
         count: 2,
         randomization: 0,
-    };
-    let bytes = encode(&packet);
+    }
+}
+
+#[test]
+fn level_particles_put_the_particle_type_first() {
+    let bytes = encode(&level_particles(Particle::simple(particle::SWEEP_ATTACK)));
+
     assert_eq!(bytes.len(), 1 + 2 + 24 + 24 + 1 + 1);
     assert_eq!(bytes[0], 77);
     assert_eq!(&bytes[bytes.len() - 2..], [2, 0]);
+}
+
+#[test]
+fn level_particles_send_the_particle_options_before_the_flags() {
+    let dust = Particle { kind: particle_type::DUST, options: ParticleOptions::Dust { color: 0xFF0000, scale: 1.0 } };
+    let bytes = encode(&level_particles(dust));
+
+    assert_eq!(bytes[..10], [21, 0, 0xFF, 0, 0, 0x3F, 0x80, 0, 0, 0]);
+
+    let packet = LevelParticles::decode_payload(&mut bytes.as_slice()).unwrap();
+    assert_eq!(packet.count, 2);
 }
 
 #[test]

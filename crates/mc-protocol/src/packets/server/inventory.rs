@@ -4,8 +4,7 @@ use std::borrow::Cow;
 
 use mc_protocol_macros::packet;
 
-use crate::types::VarInt;
-use crate::types::bytes::Remainder;
+use crate::types::{UntrustedSlot, VarInt};
 
 /// A window button: an enchantment, a lectern page, a stonecutter or loom recipe.
 #[packet(Play, 0x11, Serverbound)]
@@ -30,8 +29,7 @@ pub struct ChangeContainerSlotState {
 #[packet(Play, 0x39, Serverbound)]
 pub struct SetCreativeModeSlot<'p> {
     pub slot: i16,
-    /// The item stack; not decoded.
-    pub item: Remainder<'p>,
+    pub item: UntrustedSlot<'p>,
 }
 
 #[packet(Play, 0x24, Serverbound)]
