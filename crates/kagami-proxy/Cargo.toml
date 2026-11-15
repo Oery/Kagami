@@ -11,3 +11,9 @@ futures-lite = "2.6.1"
 glommio = { package = "glommio-ng", version = "0.12" }
 mc_protocol = { path = "../mc-protocol" }
 
+[dev-dependencies]
+uuid = "1.26.1"
+
+[[bench]]
+name = "loopback"
+harness = false
