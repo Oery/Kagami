@@ -40,11 +40,13 @@
 //! the player or the server belongs to its handler.
 
 mod argument;
+mod tree;
 
 use std::fmt;
 
 pub use argument::{Coordinate, GreedyText, PlayerName, Position};
 pub use kagami_macros::{Command, CommandArgs, CommandValue};
+pub(crate) use tree::splice;
 
 /// A command type, registered with [`Kagami::on_command`](crate::Kagami::on_command).
 /// Derived with [`Command`] rather than implemented.

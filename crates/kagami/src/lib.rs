@@ -97,7 +97,11 @@ use std::io;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 
+use command::Command;
+use mc_protocol::packets::client::{Commands, SystemChatMessage};
+use mc_protocol::packets::server::ChatCommand;
 use mc_protocol::packets::{Clientbound, PacketKind, Serverbound};
+use mc_protocol::types::text::Text;
 use mc_protocol::{Direction, State};
 
 pub use glommio::future::timeout;
@@ -132,6 +136,19 @@ impl<S, H: Handlers<S>> Kagami<S, H> {
         }
 
         let handlers = OnPacket { handler, rest: self.handlers, kind: PhantomData::<fn() -> K> };
+
+        Kagami { state: self.state, handlers, account: self.account }
+    }
+
+    /// Runs `handler` on every `/` command named [`C::NAME`](Command::NAME),
+    /// parsed. The command is never sent to the server, and the client
+    /// completes it like its own. A command that does not parse shows the
+    /// player its usage instead of running the handler.
+    ///
+    /// Commands run among the packet handlers, in registration order: a
+    /// [`ChatCommand`] handler before this one may still drop it.
+    pub fn on_command<C: Command>(self, handler: impl for<'c> FnMut(C::Parsed<'c>, &mut Context<'_, S>)) -> Kagami<S, impl Handlers<S>> {
+        let handlers = OnCommand { handler, rest: self.handlers, command: PhantomData::<fn() -> C> };
 
         Kagami { state: self.state, handlers, account: self.account }
     }
@@ -200,6 +217,64 @@ where
         };
 
         action.then((self.handler)(packet, cx))
+    }
+}
+
+/// The handler of command `C`, after the handlers in `rest`.
+struct OnCommand<C, F, Rest> {
+    handler: F,
+    rest: Rest,
+    command: PhantomData<fn() -> C>,
+}
+
+impl<S, C, F, Rest> Handlers<S> for OnCommand<C, F, Rest>
+where
+    C: Command,
+    F: for<'c> FnMut(C::Parsed<'c>, &mut Context<'_, S>),
+    Rest: Handlers<S>,
+{
+    const INTEREST: Interest = Rest::INTEREST.with(Direction::Serverbound, State::Play, <ChatCommand as PacketKind>::ID).with(
+        Direction::Clientbound,
+        State::Play,
+        <Commands as PacketKind>::ID,
+    );
+
+    fn serverbound(&mut self, packet: &mut Serverbound<'_>, cx: &mut Context<'_, S>) -> Action {
+        let action = self.rest.serverbound(packet, cx);
+        if action == Action::Drop {
+            return action;
+        }
+
+        let Serverbound::ChatCommand(chat) = packet else {
+            return action;
+        };
+        let Some(parsed) = command::parse::<C>(&chat.command) else {
+            return action;
+        };
+
+        match parsed {
+            Ok(parsed) => (self.handler)(parsed, cx),
+            Err(error) => {
+                let usage = Text::new().red(error.to_string());
+                cx.client.send(&SystemChatMessage { content: usage.nbt(), overlay: false });
+            }
+        }
+
+        Action::Drop
+    }
+
+    fn clientbound(&mut self, packet: &mut Clientbound<'_>, cx: &mut Context<'_, S>) -> Action {
+        let action = self.rest.clientbound(packet, cx);
+        if action == Action::Drop {
+            return action;
+        }
+
+        let Clientbound::Commands(tree) = packet else {
+            return action;
+        };
+        command::splice(tree, C::NAME, C::SYNTAX);
+
+        action.then(Action::Modified)
     }
 }
 
