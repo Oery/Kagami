@@ -110,7 +110,7 @@ impl<'p> PacketWriter<'p> for ArgumentSignatures<'p> {
     }
 }
 
-#[packet(Play, 0x09, Server)]
+#[packet(Play, 0x09, Serverbound)]
 pub struct ChatMessage<'p> {
     pub message: ChatText<'p>,
     pub timestamp: i64,
@@ -119,7 +119,7 @@ pub struct ChatMessage<'p> {
     pub seen: LastSeen,
 }
 
-#[packet(Play, 0x08, Server)]
+#[packet(Play, 0x08, Serverbound)]
 pub struct SignedChatCommand<'p> {
     pub command: &'p str,
     pub timestamp: i64,

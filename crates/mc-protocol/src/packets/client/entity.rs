@@ -7,7 +7,7 @@ use crate::types::{LpVec3, VarInt};
 
 /// `data` is type-specific: falling blocks carry their block state; items and
 /// players carry zero.
-#[packet(Play, 0x01, Client)]
+#[packet(Play, 0x01, Clientbound)]
 pub struct AddEntity {
     #[format = "varint"]
     pub entity_id: i32,
@@ -25,21 +25,21 @@ pub struct AddEntity {
     pub data: i32,
 }
 
-#[packet(Play, 0x67, Client)]
+#[packet(Play, 0x67, Clientbound)]
 pub struct SetEntityVelocity {
     #[format = "varint"]
     pub entity_id: i32,
     pub velocity: LpVec3,
 }
 
-#[packet(Play, 0x08, Client)]
+#[packet(Play, 0x08, Clientbound)]
 pub struct BlockUpdate {
     pub location: i64,
     #[format = "varint"]
     pub block_state: i32,
 }
 
-#[packet(Play, 0x25, Client)]
+#[packet(Play, 0x25, Clientbound)]
 pub struct AddTransientBlock {
     pub location: i64,
     #[format = "varint"]
@@ -54,7 +54,7 @@ pub const FALLING_BLOCK_ENTITY_TYPE: i32 = 52;
 pub const ITEM_ENTITY_TYPE: i32 = 72;
 
 /// The collect animation: `amount` items fly from the item entity to the collector.
-#[packet(Play, 0x7F, Client)]
+#[packet(Play, 0x7F, Clientbound)]
 pub struct TakeItemEntity {
     #[format = "varint"]
     pub item_id: i32,
@@ -64,7 +64,7 @@ pub struct TakeItemEntity {
     pub amount: i32,
 }
 
-#[packet(Play, 0x22, Client)]
+#[packet(Play, 0x22, Clientbound)]
 pub struct EntityStatus {
     pub entity_id: i32,
     pub status: u8,
@@ -80,7 +80,7 @@ pub fn decode_angle(angle: u8) -> f32 {
     f32::from(angle) * 360.0 / 256.0
 }
 
-#[packet(Play, 0x36, Client)]
+#[packet(Play, 0x36, Clientbound)]
 pub struct MoveEntityPosition {
     #[format = "varint"]
     pub entity_id: i32,
@@ -93,7 +93,7 @@ pub struct MoveEntityPosition {
 }
 
 /// Angles are 1/256 turns; see [`encode_angle`] and [`decode_angle`].
-#[packet(Play, 0x37, Client)]
+#[packet(Play, 0x37, Clientbound)]
 pub struct MoveEntityPositionRotation {
     #[format = "varint"]
     pub entity_id: i32,
@@ -107,7 +107,7 @@ pub struct MoveEntityPositionRotation {
     pub pitch: u8,
 }
 
-#[packet(Play, 0x39, Client)]
+#[packet(Play, 0x39, Clientbound)]
 pub struct MoveEntityRotation {
     #[format = "varint"]
     pub entity_id: i32,
@@ -116,7 +116,7 @@ pub struct MoveEntityRotation {
     pub pitch: u8,
 }
 
-#[packet(Play, 0x23, Client)]
+#[packet(Play, 0x23, Clientbound)]
 pub struct EntityPositionSync {
     #[format = "varint"]
     pub entity_id: i32,
@@ -130,19 +130,19 @@ pub struct EntityPositionSync {
     pub on_ground: bool,
 }
 
-#[packet(Play, 0x55, Client)]
+#[packet(Play, 0x55, Clientbound)]
 pub struct SetHeadRotation {
     #[format = "varint"]
     pub entity_id: i32,
     pub yaw: u8,
 }
 
-#[packet(Play, 0x4E, Client)]
+#[packet(Play, 0x4E, Clientbound)]
 pub struct RemoveEntities {
     pub entity_ids: Vec<VarInt>,
 }
 
-#[packet(Play, 0x46, Client)]
+#[packet(Play, 0x46, Clientbound)]
 pub struct PlayerInfoRemove {
     pub uuids: Vec<Uuid>,
 }

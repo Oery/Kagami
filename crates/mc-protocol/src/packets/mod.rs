@@ -2,6 +2,7 @@ use futures_lite::{AsyncWrite, AsyncWriteExt};
 use uuid::Uuid;
 
 use crate::auth::Property;
+use crate::direction::Direction;
 use crate::error::{DecodeError, EncodeError};
 use crate::packets::client::*;
 use crate::packets::server::*;
@@ -147,6 +148,7 @@ pub trait PacketWriter<'p>: Sized {
 // Deliberately supports local, non-Send transports (Glommio).
 #[allow(async_fn_in_trait)]
 pub trait Payload<'p>: Sized {
+    const DIRECTION: Direction;
     const ID: VarInt;
     const STATE: State;
 

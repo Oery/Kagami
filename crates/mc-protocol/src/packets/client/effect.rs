@@ -2,11 +2,11 @@
 
 use mc_protocol_macros::packet;
 
-use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::packets::{PacketWriter, Payload};
 use crate::types::VarInt;
+use crate::{Direction, State};
 
 /// `InteractionHand` ordinals; distinct from the configured dominant arm.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -28,7 +28,7 @@ pub enum SwingKind {
 /// The default `SwingAnimation` component duration, in client ticks.
 pub const SWING_TICKS: i32 = 6;
 
-#[packet(Play, 0x7B, Client)]
+#[packet(Play, 0x7B, Clientbound)]
 pub struct SwingAnimation {
     #[format = "varint"]
     pub entity_id: i32,
@@ -46,7 +46,7 @@ pub mod animation {
     pub const MAGIC_CRITICAL_HIT: u8 = 2;
 }
 
-#[packet(Play, 0x02, Client)]
+#[packet(Play, 0x02, Clientbound)]
 pub struct EntityAnimation {
     #[format = "varint"]
     pub entity_id: i32,
@@ -91,7 +91,7 @@ pub mod sound_category {
 }
 
 /// Positions are fixed-point eighths of a block.
-#[packet(Play, 0x77, Client)]
+#[packet(Play, 0x77, Clientbound)]
 pub struct SoundEffect<'p> {
     pub sound: InlineSound<'p>,
     #[format = "varint"]
@@ -104,7 +104,7 @@ pub struct SoundEffect<'p> {
     pub seed: i64,
 }
 
-#[packet(Play, 0x76, Client)]
+#[packet(Play, 0x76, Clientbound)]
 pub struct EntitySoundEffect<'p> {
     pub sound: InlineSound<'p>,
     #[format = "varint"]
@@ -124,6 +124,7 @@ pub struct StopSound<'p> {
 }
 
 impl<'p> Payload<'p> for StopSound<'p> {
+    const DIRECTION: Direction = Direction::Clientbound;
     const ID: VarInt = VarInt(0x79);
     const STATE: State = State::Play;
 
@@ -171,7 +172,7 @@ pub mod particle {
 }
 
 /// Level Particles for particle types without options; their data is empty.
-#[packet(Play, 0x30, Client)]
+#[packet(Play, 0x30, Clientbound)]
 pub struct LevelParticles {
     #[format = "varint"]
     pub particle: i32,
@@ -200,7 +201,7 @@ pub mod mob_effect_flags {
 }
 
 /// Adds or replaces a status effect; a duration of -1 never expires.
-#[packet(Play, 0x87, Client)]
+#[packet(Play, 0x87, Clientbound)]
 pub struct UpdateMobEffect {
     #[format = "varint"]
     pub entity_id: i32,
@@ -214,7 +215,7 @@ pub struct UpdateMobEffect {
     pub flags: u8,
 }
 
-#[packet(Play, 0x4F, Client)]
+#[packet(Play, 0x4F, Clientbound)]
 pub struct RemoveMobEffect {
     #[format = "varint"]
     pub entity_id: i32,
@@ -284,7 +285,7 @@ impl<'p> PacketWriter<'p> for AttributeSnapshot<'p> {
     }
 }
 
-#[packet(Play, 0x86, Client)]
+#[packet(Play, 0x86, Clientbound)]
 pub struct UpdateAttributes<'p> {
     #[format = "varint"]
     pub entity_id: i32,

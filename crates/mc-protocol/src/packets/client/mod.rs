@@ -24,22 +24,22 @@ pub use scoreboard::*;
 
 /// The raw JSON is kept so unknown fields survive; see
 /// [`Status`](crate::data::motd::Status) for building one.
-#[packet(Status, 0x00, Client)]
+#[packet(Status, 0x00, Clientbound)]
 pub struct StatusPacket<'p> {
     pub json: &'p str,
 }
 
-#[packet(Status, 0x01, Client)]
+#[packet(Status, 0x01, Clientbound)]
 pub struct PingResponse {
     pub time: i64,
 }
 
-#[packet(Login, 0x00, Client)]
+#[packet(Login, 0x00, Clientbound)]
 pub struct LoginDisconnect<'p> {
     pub reason: &'p str,
 }
 
-#[packet(Login, 0x01, Client)]
+#[packet(Login, 0x01, Clientbound)]
 pub struct EncryptionRequest<'p> {
     pub server_id: &'p str,
     pub public_key: &'p [u8],
@@ -47,19 +47,19 @@ pub struct EncryptionRequest<'p> {
     pub should_authenticate: bool,
 }
 
-#[packet(Login, 0x02, Client)]
+#[packet(Login, 0x02, Clientbound)]
 pub struct LoginSuccess<'p> {
     pub profile: GameProfile<'p>,
     pub session_id: Uuid,
 }
 
-#[packet(Login, 0x03, Client)]
+#[packet(Login, 0x03, Clientbound)]
 pub struct SetCompression {
     #[format = "varint"]
     pub threshold: i32,
 }
 
-#[packet(Login, 0x04, Client)]
+#[packet(Login, 0x04, Clientbound)]
 pub struct LoginPluginRequest<'p> {
     #[format = "varint"]
     pub message_id: i32,
@@ -67,57 +67,57 @@ pub struct LoginPluginRequest<'p> {
     pub data: &'p [u8],
 }
 
-#[packet(Login, 0x05, Client)]
+#[packet(Login, 0x05, Clientbound)]
 pub struct LoginCookieRequest<'p> {
     pub key: &'p str,
 }
 
-#[packet(Config, 0x00, Client)]
+#[packet(Config, 0x00, Clientbound)]
 pub struct ConfigCookieRequest<'p> {
     pub key: &'p str,
 }
 
-#[packet(Config, 0x01, Client)]
+#[packet(Config, 0x01, Clientbound)]
 pub struct PluginMessage<'p> {
     pub ident: &'p str,
     pub data: Remainder<'p>,
 }
 
-#[packet(Config, 0x02, Client)]
+#[packet(Config, 0x02, Clientbound)]
 pub struct ConfigDisconnect<'p> {
     pub reason: Nbt<'p>,
 }
 
-#[packet(Play, 0x20, Client)]
+#[packet(Play, 0x20, Clientbound)]
 pub struct PlayDisconnect<'p> {
     pub reason: Nbt<'p>,
 }
 
-#[packet(Config, 0x04, Client)]
+#[packet(Config, 0x04, Clientbound)]
 pub struct ConfigKeepAlive {
     pub id: i64,
 }
 
-#[packet(Config, 0x06, Client)]
+#[packet(Config, 0x06, Clientbound)]
 pub struct ResetChat;
 
-#[packet(Config, 0x14, Client)]
+#[packet(Config, 0x14, Clientbound)]
 pub struct CodeOfConduct<'p> {
     pub coc: &'p str,
 }
 
 // NOTE: unused by vanilla server
-// #[packet(Config, 0x05, Client)]
+// #[packet(Config, 0x05, Clientbound)]
 // pub struct ConfigPing {
 //     pub id: i32,
 // }
 
-#[packet(Config, 0x08, Client)]
+#[packet(Config, 0x08, Clientbound)]
 pub struct RemoveResourcePack {
     pub uuid: Option<Uuid>,
 }
 
-#[packet(Config, 0x0B, Client)]
+#[packet(Config, 0x0B, Clientbound)]
 pub struct StoreCookie<'p> {
     pub key: &'p str,
     pub payload: &'p [u8],
@@ -125,65 +125,65 @@ pub struct StoreCookie<'p> {
 
 // TODO: enforce max sizes in parsing
 
-#[packet(Config, 0x0C, Client)]
+#[packet(Config, 0x0C, Clientbound)]
 pub struct Transfer<'p> {
     pub host: &'p str,
     #[format = "varint"]
     pub port: i32,
 }
 
-#[packet(Config, 0x12, Client)]
+#[packet(Config, 0x12, Clientbound)]
 pub struct ClearDialog;
 
-#[packet(Play, 0x00, Client)]
+#[packet(Play, 0x00, Clientbound)]
 pub struct BundleDelimiter;
 
-#[packet(Play, 0x04, Client)]
+#[packet(Play, 0x04, Clientbound)]
 pub struct AcknowledgeBlockChange {
     #[format = "varint"]
     pub sequence_id: i32,
 }
 
-#[packet(Play, 0x0B, Client)]
+#[packet(Play, 0x0B, Clientbound)]
 pub struct ChunkBatchFinished {
     #[format = "varint"]
     pub batch_size: i32,
 }
 
-#[packet(Play, 0x0C, Client)]
+#[packet(Play, 0x0C, Clientbound)]
 pub struct ChunkBatchStart;
 
-#[packet(Play, 0x26, Client)]
+#[packet(Play, 0x26, Clientbound)]
 pub struct UnloadChunk {
     pub chunk_z: i32,
     pub chunk_x: i32,
 }
 
-#[packet(Play, 0x2D, Client)]
+#[packet(Play, 0x2D, Clientbound)]
 pub struct PlayKeepAlive {
     pub id: i64,
 }
 
-#[packet(Play, 0x27, Client)]
+#[packet(Play, 0x27, Clientbound)]
 pub struct GameEvent {
     pub event: u8,
     pub value: f32,
 }
 
-#[packet(Play, 0x5F, Client)]
+#[packet(Play, 0x5F, Clientbound)]
 pub struct SetCamera {
     #[format = "varint"]
     pub camera_id: i32,
 }
 
-#[packet(Play, 0x41, Client)]
+#[packet(Play, 0x41, Clientbound)]
 pub struct PlayerAbilities {
     pub flags: u8,
     pub flying_speed: f32,
     pub fov_modifier: f32,
 }
 
-#[packet(Play, 0x63, Client)]
+#[packet(Play, 0x63, Clientbound)]
 pub struct SetDefaultSpawnPosition<'p> {
     pub dimension_name: &'p str,
     pub location: i64,
@@ -191,7 +191,7 @@ pub struct SetDefaultSpawnPosition<'p> {
     pub pitch: f32,
 }
 
-#[packet(Play, 0x6A, Client)]
+#[packet(Play, 0x6A, Clientbound)]
 pub struct SetHealth {
     pub health: f32,
     #[format = "varint"]
@@ -199,14 +199,14 @@ pub struct SetHealth {
     pub saturation: f32,
 }
 
-#[packet(Play, 0x60, Client)]
+#[packet(Play, 0x60, Clientbound)]
 pub struct SetCenterChunk {
     #[format = "varint"]
     pub chunk_x: i32,
     #[format = "varint"]
     pub chunk_z: i32,
 }
-#[packet(Play, 0x49, Client)]
+#[packet(Play, 0x49, Clientbound)]
 pub struct SyncPlayerPosition {
     #[format = "varint"]
     pub teleport_id: i32,
@@ -221,7 +221,7 @@ pub struct SyncPlayerPosition {
     pub flags: i32,
 }
 
-#[packet(Play, 0x2E, Client)]
+#[packet(Play, 0x2E, Clientbound)]
 pub struct ChunkData<'p> {
     pub chunk_x: i32,
     pub chunk_z: i32,
@@ -231,13 +231,13 @@ pub struct ChunkData<'p> {
     pub light: LightData<'p>,
 }
 
-#[packet(Play, 0x0E, Client)]
+#[packet(Play, 0x0E, Clientbound)]
 pub struct ClearTitles {
     pub reset: bool,
 }
 
 /// Shared presentation above and below the player list. Empty components clear it.
-#[packet(Play, 0x7D, Client)]
+#[packet(Play, 0x7D, Clientbound)]
 pub struct TabList<'p> {
     pub header: Nbt<'p>,
     pub footer: Nbt<'p>,
@@ -247,41 +247,41 @@ pub struct TabList<'p> {
 #[path = "../../tests/tests_packets_tab_list.rs"]
 mod tab_list_tests;
 
-#[packet(Play, 0x33, Client)]
+#[packet(Play, 0x33, Clientbound)]
 pub struct LowDiskSpaceWarning;
 
-#[packet(Play, 0x43, Client)]
+#[packet(Play, 0x43, Clientbound)]
 pub struct EndCombat {
     #[format = "varint"]
     pub duration: i32,
 }
 
-#[packet(Play, 0x44, Client)]
+#[packet(Play, 0x44, Clientbound)]
 pub struct EnterCombat;
 
-#[packet(Play, 0x78, Client)]
+#[packet(Play, 0x78, Clientbound)]
 pub struct StartConfiguration;
 
-#[packet(Config, 0x0F, Client)]
+#[packet(Config, 0x0F, Clientbound)]
 pub struct KnownPacks<'p> {
     pub packs: Vec<KnownPack<'p>>,
 }
 
-#[packet(Config, 0x07, Client)]
+#[packet(Config, 0x07, Clientbound)]
 pub struct RegistryData<'p> {
     pub registry: &'p str,
     pub entries: Vec<RegistryEntry<'p>>,
 }
 
-#[packet(Config, 0x0D, Client)]
+#[packet(Config, 0x0D, Clientbound)]
 pub struct FeatureFlags<'p> {
     pub flags: Vec<&'p str>,
 }
 
-#[packet(Config, 0x0E, Client)]
+#[packet(Config, 0x0E, Clientbound)]
 pub struct UpdateTags<'p> {
     pub registries: Vec<TaggedRegistry<'p>>,
 }
 
-#[packet(Config, 0x03, Client)]
+#[packet(Config, 0x03, Clientbound)]
 pub struct FinishConfiguration;

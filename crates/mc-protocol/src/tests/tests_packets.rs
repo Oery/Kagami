@@ -1,6 +1,6 @@
 use super::*;
 
-#[mc_protocol_macros::packet(Play, 0x7e, Client)]
+#[mc_protocol_macros::packet(Play, 0x7e, Clientbound)]
 struct QualifiedPacket<'wire> {
     #[format = "varint"]
     number: std::primitive::i32,

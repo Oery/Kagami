@@ -6,24 +6,24 @@ use crate::encode::Result as EncodeResult;
 use crate::packets::PacketWriter;
 use crate::types::VarInt;
 
-#[packet(Play, 0x0C, Server)]
+#[packet(Play, 0x0C, Serverbound)]
 pub struct ClientCommand {
     #[format = "varint"]
     pub action: i32,
 }
 
-#[packet(Play, 0x13, Server)]
+#[packet(Play, 0x13, Serverbound)]
 pub struct CloseContainer {
     #[format = "varint"]
     pub window_id: i32,
 }
 
-#[packet(Play, 0x36, Server)]
+#[packet(Play, 0x36, Serverbound)]
 pub struct SetHeldItem {
     pub slot: i16,
 }
 
-#[packet(Play, 0x29, Server)]
+#[packet(Play, 0x29, Serverbound)]
 pub struct PlayerAction {
     #[format = "varint"]
     pub action: i32,
@@ -42,7 +42,7 @@ impl PlayerAction {
     pub const SWAP_ITEM_WITH_OFFHAND: i32 = 7;
 }
 
-#[packet(Play, 0x2A, Server)]
+#[packet(Play, 0x2A, Serverbound)]
 pub struct PlayerCommand {
     #[format = "varint"]
     pub entity_id: i32,
@@ -52,18 +52,18 @@ pub struct PlayerCommand {
     pub jump_boost: i32,
 }
 
-#[packet(Play, 0x2B, Server)]
+#[packet(Play, 0x2B, Serverbound)]
 pub struct PlayerInput {
     pub flags: u8,
 }
 
-#[packet(Play, 0x28, Server)]
+#[packet(Play, 0x28, Serverbound)]
 pub struct PlayerAbilitiesRequest {
     /// The client may only request the flying bit (0x02).
     pub flags: u8,
 }
 
-#[packet(Play, 0x42, Server)]
+#[packet(Play, 0x42, Serverbound)]
 pub struct UseItemOn {
     #[format = "varint"]
     pub hand: i32,
@@ -79,7 +79,7 @@ pub struct UseItemOn {
     pub sequence: i32,
 }
 
-#[packet(Play, 0x43, Server)]
+#[packet(Play, 0x43, Serverbound)]
 pub struct UseItem {
     #[format = "varint"]
     pub hand: i32,
@@ -162,7 +162,7 @@ impl<'p> PacketWriter<'p> for ChangedSlot {
     }
 }
 
-#[packet(Play, 0x12, Server)]
+#[packet(Play, 0x12, Serverbound)]
 pub struct ClickContainer {
     #[format = "varint"]
     pub window_id: i32,

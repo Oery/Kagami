@@ -126,7 +126,7 @@ impl<'p> PacketWriter<'p> for ObjectiveAction<'p> {
     }
 }
 
-#[packet(Play, 0x6C, Client)]
+#[packet(Play, 0x6C, Clientbound)]
 pub struct SetObjective<'p> {
     pub name: &'p str,
     pub action: ObjectiveAction<'p>,
@@ -134,14 +134,14 @@ pub struct SetObjective<'p> {
 
 /// Slots: 0 = Tab list, 1 = sidebar, 2 = below name; 3..=18 are team sidebars.
 /// An empty objective name clears the slot.
-#[packet(Play, 0x64, Client)]
+#[packet(Play, 0x64, Clientbound)]
 pub struct SetDisplayObjective<'p> {
     #[format = "varint"]
     pub slot: i32,
     pub name: &'p str,
 }
 
-#[packet(Play, 0x70, Client)]
+#[packet(Play, 0x70, Clientbound)]
 pub struct SetScore<'p> {
     pub holder: &'p str,
     pub objective: &'p str,
@@ -152,7 +152,7 @@ pub struct SetScore<'p> {
 }
 
 /// `None` removes this holder's scores from every objective.
-#[packet(Play, 0x50, Client)]
+#[packet(Play, 0x50, Clientbound)]
 pub struct ResetScore<'p> {
     pub holder: &'p str,
     pub objective: Option<&'p str>,

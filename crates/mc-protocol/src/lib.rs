@@ -4,12 +4,14 @@ extern crate self as mc_protocol;
 pub mod auth;
 pub mod data;
 pub mod decode;
+pub mod direction;
 pub mod encode;
 pub mod error;
 pub mod packets;
 pub mod state;
 pub mod types;
 
+pub use crate::direction::Direction;
 pub use crate::packets::{PacketWriter, Payload};
 pub use crate::state::State;
 pub use crate::types::VarInt;

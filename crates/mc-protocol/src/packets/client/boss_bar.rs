@@ -99,7 +99,7 @@ impl<'p> PacketWriter<'p> for BossBarAction<'p> {
     }
 }
 
-#[packet(Play, 0x09, Client)]
+#[packet(Play, 0x09, Clientbound)]
 pub struct BossBar<'p> {
     pub id: Uuid,
     pub action: BossBarAction<'p>,

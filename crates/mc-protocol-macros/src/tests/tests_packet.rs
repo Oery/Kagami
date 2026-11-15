@@ -3,9 +3,11 @@ use super::*;
 #[test]
 fn invalid_packet_attributes_and_declarations_have_specific_diagnostics() {
     for (attributes, expected) in [
-        (quote!(Unknown, 0x00, Client), "unknown packet state"),
-        (quote!(Play, 0x00, Unknown), "expected Client or Server"),
-        (quote!(Play, 0x00, Client, extra), "unexpected token"),
+        (quote!(Unknown, 0x00, Clientbound), "unknown packet state"),
+        (quote!(Play, 0x00, Unknown), "expected Serverbound or Clientbound"),
+        (quote!(Play, 0x100, Clientbound), "packet ids must be in 0..=255"),
+        (quote!(Play, -1, Clientbound), "packet ids must be in 0..=255"),
+        (quote!(Play, 0x00, Clientbound, extra), "unexpected token"),
     ] {
         let error = syn::parse2::<PacketAttributes>(attributes).err().unwrap();
         assert!(error.to_string().contains(expected), "{error}");
@@ -41,7 +43,7 @@ fn invalid_packet_attributes_and_declarations_have_specific_diagnostics() {
             "at most one lifetime",
         ),
     ] {
-        let attributes = syn::parse2(quote!(Play, 0x00, Client)).unwrap();
+        let attributes = syn::parse2(quote!(Play, 0x00, Clientbound)).unwrap();
         let error = expand_packet(attributes, &input).unwrap_err();
         assert!(error.to_string().contains(expected), "{error}");
     }

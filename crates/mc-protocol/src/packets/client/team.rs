@@ -76,7 +76,7 @@ impl<'p> PacketWriter<'p> for TeamAction<'p> {
     }
 }
 
-#[packet(Play, 0x6F, Client)]
+#[packet(Play, 0x6F, Clientbound)]
 pub struct SetPlayerTeam<'p> {
     pub name: &'p str,
     pub action: TeamAction<'p>,

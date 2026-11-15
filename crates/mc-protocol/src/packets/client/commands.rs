@@ -148,7 +148,7 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
     }
 }
 
-#[packet(Play, 0x10, Client)]
+#[packet(Play, 0x10, Clientbound)]
 pub struct Commands<'p> {
     pub nodes: Vec<CommandNode<'p>>,
     #[format = "varint"]
@@ -179,7 +179,7 @@ impl<'p> PacketWriter<'p> for CommandMatch<'p> {
     }
 }
 
-#[packet(Play, 0x0F, Client)]
+#[packet(Play, 0x0F, Clientbound)]
 pub struct CommandSuggestionsResponse<'p> {
     #[format = "varint"]
     pub transaction_id: i32,
@@ -190,26 +190,26 @@ pub struct CommandSuggestionsResponse<'p> {
     pub matches: Vec<CommandMatch<'p>>,
 }
 
-#[packet(Play, 0x7C, Client)]
+#[packet(Play, 0x7C, Clientbound)]
 pub struct SystemChatMessage<'p> {
     pub content: Nbt<'p>,
     pub overlay: bool,
 }
 
 /// Stored until the next title is shown.
-#[packet(Play, 0x72, Client)]
+#[packet(Play, 0x72, Clientbound)]
 pub struct SetSubtitleText<'p> {
     pub text: Nbt<'p>,
 }
 
 /// Shows the title together with the stored subtitle.
-#[packet(Play, 0x74, Client)]
+#[packet(Play, 0x74, Clientbound)]
 pub struct SetTitleText<'p> {
     pub text: Nbt<'p>,
 }
 
 /// Durations in ticks.
-#[packet(Play, 0x75, Client)]
+#[packet(Play, 0x75, Clientbound)]
 pub struct SetTitlesAnimation {
     pub fade_in: i32,
     pub stay: i32,

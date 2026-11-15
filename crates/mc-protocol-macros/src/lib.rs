@@ -9,9 +9,9 @@ mod format;
 use attrs::PacketAttributes;
 use format::Format;
 
-enum Origin {
-    Client,
-    Server,
+enum Direction {
+    Serverbound,
+    Clientbound,
 }
 
 enum State {
@@ -50,7 +50,7 @@ pub fn packet(attr: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Result<Tokens> {
-    let PacketAttributes { id, state } = attributes;
+    let PacketAttributes { id, state, direction } = attributes;
     let Data::Struct(data) = &item.data else {
         return Err(syn::Error::new_spanned(item, "packets must be structs"));
     };
@@ -72,6 +72,11 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
         State::Config => quote!(Config),
         State::Play => quote!(Play),
     };
+    let direction = match direction {
+        Direction::Serverbound => quote!(Serverbound),
+        Direction::Clientbound => quote!(Clientbound),
+    };
+    let id = i32::from(id);
 
     let mut decodes = Vec::new();
     let mut encodes = Vec::new();
@@ -119,6 +124,7 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
         #item
 
         impl #impl_generics ::mc_protocol::Payload<#lifetime> for #name #ty_generics #where_clause {
+            const DIRECTION: ::mc_protocol::Direction = ::mc_protocol::Direction::#direction;
             const ID: ::mc_protocol::VarInt = ::mc_protocol::VarInt(#id);
             const STATE: ::mc_protocol::State = ::mc_protocol::State::#state;
 

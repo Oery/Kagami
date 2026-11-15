@@ -4,7 +4,7 @@ use mc_protocol_macros::packet;
 
 use super::DeathLocation;
 
-#[packet(Play, 0x32, Client)]
+#[packet(Play, 0x32, Clientbound)]
 pub struct PlayLogin<'p> {
     pub entity_id: i32,
     pub hardcore: bool,
