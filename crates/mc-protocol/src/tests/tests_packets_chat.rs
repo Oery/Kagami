@@ -1,7 +1,7 @@
 use super::*;
 use crate::Payload;
 use crate::State;
-use crate::packets::{Context, Packets};
+use crate::packets::Serverbound;
 
 fn seen() -> LastSeen {
     LastSeen { count: 0, acknowledged: [0; 3], checksum: 1 }
@@ -22,10 +22,9 @@ fn chat_decodes_signed_and_unsigned_and_rejects_truncated_metadata() {
         for length in 0..body.len() {
             assert!(ChatMessage::decode_payload(&mut &body[..length]).is_err());
         }
-        let mut frame = vec![9];
-        frame.extend_from_slice(&body);
-        let context = Context { state: State::Play, ..Default::default() };
-        assert!(matches!(Packets::read(&mut frame.as_slice(), &context).unwrap(), Packets::ChatMessage(_)));
+        let mut frame_body = vec![9];
+        frame_body.extend_from_slice(&body);
+        assert!(matches!(Serverbound::decode(State::Play, &frame_body).unwrap(), Serverbound::ChatMessage(_)));
     }
 }
 

@@ -1,7 +1,7 @@
 use super::*;
+use crate::packets::Serverbound;
 use crate::packets::client::ClearTitles;
 use crate::packets::server::{ChatCommand, CommandSuggestion};
-use crate::packets::{Context, Packets};
 use crate::{PacketWriter, Payload, State, VarInt};
 
 #[test]
@@ -34,23 +34,18 @@ fn commands_and_completion_requests_dispatch_only_in_play() {
     ] {
         let mut input = packet.as_slice();
         VarInt::read(&mut input).unwrap();
-        let ctx = Context { state: State::Play, ..Default::default() };
-        match Packets::read(&mut input, &ctx).unwrap() {
-            Packets::ChatCommand(p) => assert_eq!(p.command, "gamemode 1"),
-            Packets::CommandSuggestion(p) => {
+        match Serverbound::decode(State::Play, input).unwrap() {
+            Serverbound::ChatCommand(p) => assert_eq!(p.command, "gamemode 1"),
+            Serverbound::CommandSuggestion(p) => {
                 assert_eq!(p.transaction_id, 42);
                 assert_eq!(p.text, "/gamemode creative Pl");
             }
             _ => panic!("wrong dispatch"),
         }
-        assert!(input.is_empty());
     }
     assert!(ChatCommand::decode_payload(&mut [8, b'g'].as_slice()).is_err());
     assert!(CommandSuggestion::decode_payload(&mut [42].as_slice()).is_err());
-    assert!(matches!(
-        Packets::read(&mut [0x07, 0].as_slice(), &Context::default()),
-        Err(DecodeError::UnknownPacket(7))
-    ));
+    assert!(matches!(Serverbound::decode(State::Handshake, &[0x07, 0]), Ok(Serverbound::Raw(_))));
 }
 
 #[test]

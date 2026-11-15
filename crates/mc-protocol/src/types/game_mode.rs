@@ -5,9 +5,8 @@ use mc_protocol_macros::IntoOwned;
 use crate::error::DecodeError;
 
 /// Protocol game-mode IDs. Gameplay policy belongs to the server.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, IntoOwned)]
 #[repr(i32)]
-#[derive(IntoOwned)]
 pub enum GameMode {
     #[default]
     Survival = 0,

@@ -70,6 +70,23 @@ pub struct ClientInformation<'p> {
     pub particle_status: ParticleStatus,
 }
 
+/// The same settings as [`ClientInformation`], resent in Play when they change.
+#[packet(Play, 0x0E, Serverbound)]
+pub struct PlayClientInformation<'p> {
+    pub locale: Cow<'p, str>,
+    pub render_distance: u8,
+    #[format = "varint"]
+    pub chat_mode: ChatMode,
+    pub chat_colors: bool,
+    pub skin_parts: SkinParts,
+    #[format = "varint"]
+    pub main_hand: Hand,
+    pub text_filtering: bool,
+    pub allow_server_listing: bool,
+    #[format = "varint"]
+    pub particle_status: ParticleStatus,
+}
+
 #[packet(Config, 0x01, Serverbound)]
 pub struct ConfigCookieResponse<'p> {
     pub key: Cow<'p, str>,
@@ -91,7 +108,7 @@ pub struct ConfigKnownPacks<'p> {
 }
 
 #[packet(Config, 0x04, Serverbound)]
-pub struct ConfigKeepAlive {
+pub struct ConfigKeepAliveResponse {
     pub id: i64,
 }
 

@@ -50,32 +50,57 @@ fn invalid_packet_attributes_and_declarations_have_specific_diagnostics() {
 }
 
 #[test]
-fn inner_packet_rejects_invalid_variant_shapes() {
-    for input in [
-        syn::parse_quote!(
-            struct Bad;
+fn packet_enums_reject_invalid_shapes() {
+    for (direction, input, expected) in [
+        (
+            quote!(Sideways),
+            quote!(
+                enum Bad<'p> {
+                    A(A<'p>),
+                }
+            ),
+            "expected Serverbound or Clientbound",
         ),
-        syn::parse_quote!(
-            enum Bad {
-                Unit,
-            }
+        (
+            quote!(Serverbound),
+            quote!(
+                enum Bad {
+                    A(A),
+                }
+            ),
+            "exactly one lifetime",
         ),
-        syn::parse_quote!(
-            enum Bad {
-                Pair(A, B),
-            }
+        (
+            quote!(Serverbound),
+            quote!(
+                enum Bad<'p> {
+                    A,
+                }
+            ),
+            "exactly one packet",
         ),
-        syn::parse_quote!(
-            enum Bad {
-                Empty(),
-            }
+        (
+            quote!(Serverbound),
+            quote!(
+                enum Bad<'p> {
+                    A(A<'p>, B),
+                }
+            ),
+            "exactly one packet",
         ),
-        syn::parse_quote!(
-            enum Bad {
-                Named { value: A },
-            }
+        (
+            quote!(Serverbound),
+            quote!(
+                enum Bad<'p> {
+                    A { packet: A<'p> },
+                }
+            ),
+            "exactly one packet",
         ),
     ] {
-        assert!(expand_inner_packet(&input).is_err());
+        let direction = syn::parse2(direction).unwrap();
+        let input = syn::parse2(input).unwrap();
+        let error = expand_packet_enum(direction, &input).unwrap_err();
+        assert!(error.to_string().contains(expected), "{error}");
     }
 }

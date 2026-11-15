@@ -7,7 +7,7 @@ license.workspace = true
 [dependencies]
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
-syn = {version = "3.0.6", features = ["full"] }
+syn = {version = "3.0.6", features = ["full", "visit-mut"] }
 
 [lib]
 proc-macro = true

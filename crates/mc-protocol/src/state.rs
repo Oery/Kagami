@@ -3,7 +3,7 @@ use mc_protocol_macros::IntoOwned;
 use crate::error::DecodeError;
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum State {
     #[default]
     Handshake,
@@ -14,9 +14,8 @@ pub enum State {
 }
 
 /// The handshake carries an intent, not a freely selectable protocol state.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, IntoOwned)]
 #[repr(i32)]
-#[derive(IntoOwned)]
 pub enum HandshakeIntent {
     Status = 1,
     Login = 2,

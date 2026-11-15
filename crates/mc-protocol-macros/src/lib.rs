@@ -6,10 +6,12 @@ use syn::{Data, DeriveInput, Fields, Generics, Lifetime, Type, parse_macro_input
 mod attrs;
 mod format;
 mod owned;
+mod packet_enum;
 
 use attrs::PacketAttributes;
 use format::Format;
 use owned::expand_into_owned;
+use packet_enum::expand_packet_enum;
 
 enum Direction {
     Serverbound,
@@ -168,45 +170,15 @@ pub fn derive_into_owned(input: TokenStream) -> TokenStream {
     expand_into_owned(&item).unwrap_or_else(syn::Error::into_compile_error).into()
 }
 
-#[proc_macro_derive(InnerPacket)]
-pub fn derive_inner_packet(input: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(input as DeriveInput);
-    expand_inner_packet(&item).unwrap_or_else(syn::Error::into_compile_error).into()
-}
-
-fn expand_inner_packet(item: &DeriveInput) -> syn::Result<Tokens> {
-    let Data::Enum(data) = &item.data else {
-        return Err(syn::Error::new_spanned(item, "InnerPacket requires an enum"));
-    };
-    let ident = &item.ident;
-    let (implementation, lifetime) = codec_generics(&item.generics)?;
-    let (impl_generics, _, where_clause) = implementation.split_for_impl();
-    let (_, ty_generics, _) = item.generics.split_for_impl();
-    let mut id_cases = Vec::new();
-    let mut state_cases = Vec::new();
-    for variant in &data.variants {
-        let Fields::Unnamed(fields) = &variant.fields else {
-            return Err(syn::Error::new_spanned(variant, "variants require exactly one packet field"));
-        };
-        if fields.unnamed.len() != 1 {
-            return Err(syn::Error::new_spanned(variant, "variants require exactly one packet field"));
-        }
-        let name = &variant.ident;
-        let ty = &fields.unnamed[0].ty;
-        id_cases.push(quote!(Self::#name(_) => <#ty as Payload<#lifetime>>::ID.0));
-        state_cases.push(quote!(Self::#name(_) => <#ty as Payload<#lifetime>>::STATE));
-    }
-    Ok(quote! {
-        impl #impl_generics InnerPacket for #ident #ty_generics #where_clause {
-            fn id(&self) -> i32 {
-                match self { #(#id_cases),* }
-            }
-
-            fn state(&self) -> State {
-                match self { #(#state_cases),* }
-            }
-        }
-    })
+/// Lists a direction's packets: `#[packet_enum(Serverbound)] pub enum Serverbound<'p> { ChatCommand(ChatCommand<'p>), .. }`.
+///
+/// Appends a `Raw` variant for packets without a definition, and generates
+/// `decode(state, body)`, `encode(out)` and a `PacketKind` for each packet.
+#[proc_macro_attribute]
+pub fn packet_enum(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let direction = parse_macro_input!(attr as syn::Ident);
+    let item = parse_macro_input!(input as syn::ItemEnum);
+    expand_packet_enum(direction, &item).unwrap_or_else(syn::Error::into_compile_error).into()
 }
 
 #[cfg(test)]
