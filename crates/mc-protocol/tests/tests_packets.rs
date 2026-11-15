@@ -125,8 +125,9 @@ fn packet_kinds_name_packets_without_their_lifetime() {
 
     let frame = encode(&ChatCommand { command: "spawn".into() });
     let mut packet = Serverbound::decode(State::Play, body(&frame)).unwrap();
-    assert!(<ClientTickEnd as PacketKind>::pick(&mut packet).is_none());
-    let command = <ChatCommand as PacketKind>::pick(&mut packet).unwrap();
+    assert!(<ClientTickEnd as PacketKind>::from_serverbound(&mut packet).is_none());
+    assert!(<SystemChatMessage as PacketKind>::from_serverbound(&mut packet).is_none());
+    let command = <ChatCommand as PacketKind>::from_serverbound(&mut packet).unwrap();
     command.command = Cow::Owned("home".to_owned());
     let mut edited = Vec::new();
     packet.encode(&mut edited).unwrap();

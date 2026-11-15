@@ -66,7 +66,8 @@ pub trait Payload<'p>: Sized {
 ///
 /// Implemented on the `'static` form of every packet listed in
 /// [`Serverbound`] or [`Clientbound`]: `ChatCommand` names the kind, while
-/// [`pick`](Self::pick) hands out a `ChatCommand<'p>` borrowing the buffer.
+/// [`from_serverbound`](Self::from_serverbound) hands out a
+/// `ChatCommand<'p>` borrowing the buffer.
 pub trait PacketKind: 'static {
     const DIRECTION: Direction;
     const STATE: State;
@@ -75,11 +76,13 @@ pub trait PacketKind: 'static {
     /// This packet, borrowing a buffer that lives for `'p`.
     type Packet<'p>: Payload<'p>;
 
-    /// The packet enum of [`DIRECTION`](Self::DIRECTION).
-    type Enum<'p>;
+    /// Returns the packet if `packet` holds this kind; always `None` for a
+    /// clientbound kind.
+    fn from_serverbound<'a, 'p>(packet: &'a mut Serverbound<'p>) -> Option<&'a mut Self::Packet<'p>>;
 
-    /// Returns the packet if `packet` holds this kind.
-    fn pick<'a, 'p>(packet: &'a mut Self::Enum<'p>) -> Option<&'a mut Self::Packet<'p>>;
+    /// Returns the packet if `packet` holds this kind; always `None` for a
+    /// serverbound kind.
+    fn from_clientbound<'a, 'p>(packet: &'a mut Clientbound<'p>) -> Option<&'a mut Self::Packet<'p>>;
 }
 
 /// A packet with no definition for its state and id. Proxied as is.

@@ -14,7 +14,9 @@ struct Variant<'a> {
 }
 
 /// Expands a direction enum: adds the `Raw` variant, `decode` by state and
-/// id, `encode`, and a `PacketKind` for every listed packet.
+/// id, `encode`, and a `PacketKind` for every listed packet. The enums must
+/// be `mc_protocol::packets::{Serverbound, Clientbound}`, since each kind
+/// picks itself out of both.
 pub fn expand_packet_enum(direction: Ident, item: &ItemEnum) -> syn::Result<Tokens> {
     if direction != "Serverbound" && direction != "Clientbound" {
         return Err(syn::Error::new_spanned(direction, "expected Serverbound or Clientbound"));
@@ -158,6 +160,18 @@ fn expand_kind(item: &ItemEnum, direction: &Ident, lifetime: &Lifetime, variant:
     let wrong_direction = format!("{name} is not {direction}");
     let id_too_large = format!("the id of {name} does not fit in a byte");
 
+    // This packet's own enum yields it; the other direction's never does.
+    let pick = quote! {
+        match packet {
+            #ident::#name(packet) => Some(packet),
+            _ => None,
+        }
+    };
+    let (from_serverbound, from_clientbound) = match direction.to_string().as_str() {
+        "Serverbound" => (pick, quote!(None)),
+        _ => (quote!(None), pick),
+    };
+
     quote! {
         const _: () = {
             assert!(matches!(#payload::DIRECTION, ::mc_protocol::Direction::#direction), #wrong_direction);
@@ -170,17 +184,17 @@ fn expand_kind(item: &ItemEnum, direction: &Ident, lifetime: &Lifetime, variant:
             const ID: u8 = #payload::ID.0 as u8;
 
             type Packet<#lifetime> = #ty;
-            type Enum<#lifetime> = #ident<#lifetime>;
 
-            // Spelled through the associated types, as in the trait, so the
-            // lifetimes bind the same way.
-            fn pick<'enum_borrow, #lifetime>(
-                packet: &'enum_borrow mut Self::Enum<#lifetime>,
+            fn from_serverbound<'enum_borrow, #lifetime>(
+                packet: &'enum_borrow mut ::mc_protocol::packets::Serverbound<#lifetime>,
             ) -> Option<&'enum_borrow mut Self::Packet<#lifetime>> {
-                match packet {
-                    #ident::#name(packet) => Some(packet),
-                    _ => None,
-                }
+                #from_serverbound
+            }
+
+            fn from_clientbound<'enum_borrow, #lifetime>(
+                packet: &'enum_borrow mut ::mc_protocol::packets::Clientbound<#lifetime>,
+            ) -> Option<&'enum_borrow mut Self::Packet<#lifetime>> {
+                #from_clientbound
             }
         }
     }
