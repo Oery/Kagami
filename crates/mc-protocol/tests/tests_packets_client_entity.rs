@@ -13,14 +13,18 @@ fn frame<P: Payload<'static>>(packet: &P) -> Vec<u8> {
     bytes
 }
 
+fn linear(on_ground: bool, dx: i16, dy: i16, dz: i16) -> EntityMovement {
+    EntityMovement { on_ground, delta: PositionDelta::Linear { dx, dy, dz } }
+}
+
 #[test]
 fn movement_uses_properties_before_signed_delta_triplet() {
     assert_eq!(
-        frame(&MoveEntityPosition { entity_id: 1, properties: 1, dx: i16::MIN, dy: i16::MAX, dz: -1 }),
+        frame(&MoveEntityPosition { entity_id: 1, movement: linear(true, i16::MIN, i16::MAX, -1) }),
         [9, 0x36, 1, 1, 0x80, 0, 0x7F, 0xFF, 0xFF, 0xFF],
     );
     assert_eq!(
-        frame(&MoveEntityPositionRotation { entity_id: 1, properties: 0, dx: 4096, dy: -4096, dz: 0, yaw: 192, pitch: 64 }),
+        frame(&MoveEntityPositionRotation { entity_id: 1, movement: linear(false, 4096, -4096, 0), yaw: 192, pitch: 64 }),
         [11, 0x37, 1, 0, 0x10, 0, 0xF0, 0, 0, 0, 192, 64],
     );
     assert_eq!(
@@ -28,6 +32,28 @@ fn movement_uses_properties_before_signed_delta_triplet() {
         [5, 0x39, 1, 1, 128, 0]
     );
     assert_eq!(frame(&SetHeadRotation { entity_id: 1, yaw: 64 }), [3, 0x55, 1, 64]);
+}
+
+#[test]
+fn stepped_movement_counts_steps_above_the_on_ground_bit_and_rotates_after_them() {
+    // On ground, two steps: properties = 1 | 2 << 1.
+    let payload = [1, 5, 0, 0x10, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0x10, 0, 192, 64];
+
+    let mut input = payload.as_slice();
+    let packet = MoveEntityPositionRotation::decode_payload(&mut input).unwrap();
+    assert!(input.is_empty());
+
+    let steps = vec![DeltaStep { ticks: 0, dx: 4096, dy: 0, dz: 0 }, DeltaStep { ticks: 1, dx: 0, dy: 0, dz: 4096 }];
+    assert_eq!(packet.movement, EntityMovement { on_ground: true, delta: PositionDelta::Stepped(steps) });
+    assert_eq!((packet.yaw, packet.pitch), (192, 64));
+    assert_eq!(&frame(&packet)[2..], payload);
+}
+
+#[test]
+fn an_empty_step_list_does_not_encode() {
+    let packet = MoveEntityPosition { entity_id: 1, movement: EntityMovement { on_ground: false, delta: PositionDelta::Stepped(vec![]) } };
+
+    assert!(packet.encode(&mut Vec::new()).is_err());
 }
 
 #[test]

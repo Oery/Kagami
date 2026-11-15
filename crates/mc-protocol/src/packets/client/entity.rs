@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
+use crate::error::EncodeError;
 use crate::packets::PacketWriter;
 use crate::types::bytes::Remainder;
 use crate::types::{LpVec3, VarInt, Vec3};
@@ -84,16 +85,136 @@ pub fn decode_angle(angle: u8) -> f32 {
     f32::from(angle) * 360.0 / 256.0
 }
 
+/// One step of a stepped movement. Deltas are fixed-point with 12
+/// fractional bits: 4096 is one block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, IntoOwned)]
+pub struct DeltaStep {
+    /// The tick of this step, counted from the packet.
+    pub ticks: i32,
+    pub dx: i16,
+    pub dy: i16,
+    pub dz: i16,
+}
+
+/// How far an entity moved. Deltas are fixed-point with 12 fractional
+/// bits: 4096 is one block.
+#[derive(Clone, Debug, PartialEq, Eq, IntoOwned)]
+pub enum PositionDelta {
+    Linear {
+        dx: i16,
+        dy: i16,
+        dz: i16,
+    },
+    /// Never empty: zero steps is how the wire says `Linear`.
+    Stepped(Vec<DeltaStep>),
+}
+
+/// The on-ground flag and the position delta of a movement packet.
+///
+/// On the wire both start in one VarInt: bit 0 is on ground, the bits
+/// above count the steps.
+#[derive(Clone, Debug, PartialEq, Eq, IntoOwned)]
+pub struct EntityMovement {
+    pub on_ground: bool,
+    pub delta: PositionDelta,
+}
+
+impl EntityMovement {
+    fn step_count(&self) -> usize {
+        match &self.delta {
+            PositionDelta::Linear { .. } => 0,
+            PositionDelta::Stepped(steps) => steps.len(),
+        }
+    }
+
+    /// Fails for an empty step list or one too long for the VarInt.
+    fn properties(&self) -> EncodeResult<i32> {
+        let step_count = self.step_count();
+        if matches!(self.delta, PositionDelta::Stepped(_)) && step_count == 0 {
+            return Err(EncodeError::InvalidLength);
+        }
+
+        let step_count = i32::try_from(step_count).map_err(|_| EncodeError::InvalidLength)?;
+        let shifted = step_count.checked_mul(2).ok_or(EncodeError::InvalidLength)?;
+
+        Ok(shifted | i32::from(self.on_ground))
+    }
+}
+
+impl PacketWriter<'_> for EntityMovement {
+    fn read(input: &mut &[u8]) -> DecodeResult<Self> {
+        let properties = VarInt::read(input)?.0 as u32;
+        let on_ground = properties & 1 != 0;
+        let step_count = properties >> 1;
+
+        if step_count == 0 {
+            let dx = i16::read(input)?;
+            let dy = i16::read(input)?;
+            let dz = i16::read(input)?;
+
+            return Ok(Self { on_ground, delta: PositionDelta::Linear { dx, dy, dz } });
+        }
+
+        // Each step takes at least seven bytes, so a short input fails
+        // before the list grows far.
+        let mut steps = Vec::new();
+
+        for _ in 0..step_count {
+            let ticks = VarInt::read(input)?.0;
+            let dx = i16::read(input)?;
+            let dy = i16::read(input)?;
+            let dz = i16::read(input)?;
+            steps.push(DeltaStep { ticks, dx, dy, dz });
+        }
+
+        Ok(Self { on_ground, delta: PositionDelta::Stepped(steps) })
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        VarInt(self.properties()?).encode(out)?;
+
+        match &self.delta {
+            PositionDelta::Linear { dx, dy, dz } => {
+                dx.encode(out)?;
+                dy.encode(out)?;
+                dz.encode(out)?;
+            }
+            PositionDelta::Stepped(steps) => {
+                for step in steps {
+                    VarInt(step.ticks).encode(out)?;
+                    step.dx.encode(out)?;
+                    step.dy.encode(out)?;
+                    step.dz.encode(out)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn body_len(&self) -> usize {
+        // Movement that cannot be encoded fails in `encode`; its length is moot.
+        let properties = self.properties().unwrap_or(0);
+        let mut length = VarInt(properties).body_len();
+
+        match &self.delta {
+            PositionDelta::Linear { .. } => length += 6,
+            PositionDelta::Stepped(steps) => {
+                for step in steps {
+                    length += VarInt(step.ticks).body_len() + 6;
+                }
+            }
+        }
+
+        length
+    }
+}
+
 #[packet(Play, 0x36, Clientbound)]
 pub struct MoveEntityPosition {
     #[format = "varint"]
     pub entity_id: i32,
-    /// Bit 0: on ground.
-    #[format = "varint"]
-    pub properties: i32,
-    pub dx: i16,
-    pub dy: i16,
-    pub dz: i16,
+    pub movement: EntityMovement,
 }
 
 /// Angles are 1/256 turns; see [`encode_angle`] and [`decode_angle`].
@@ -101,12 +222,7 @@ pub struct MoveEntityPosition {
 pub struct MoveEntityPositionRotation {
     #[format = "varint"]
     pub entity_id: i32,
-    /// Bit 0: on ground.
-    #[format = "varint"]
-    pub properties: i32,
-    pub dx: i16,
-    pub dy: i16,
-    pub dz: i16,
+    pub movement: EntityMovement,
     pub yaw: u8,
     pub pitch: u8,
 }
