@@ -1,116 +1,148 @@
-//! End-to-end loopback benchmark: a client talks to a minimal offline server,
-//! once directly and once through the proxy, and compares throughput and
-//! round-trip latency.
+//! End-to-end loopback benchmark: a client talks to a minimal server, once
+//! directly and once through the proxy, and compares throughput and round
+//! trip latency. The server runs plain, compressed, and online: encrypted
+//! and compressed, without the Mojang session check.
 //!
 //! cargo bench -p kagami-proxy --bench loopback
 
+use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
+use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use aes::Aes128;
+use cfb8::cipher::KeyIvInit;
+use flate2::Compression;
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
 use futures_lite::{AsyncReadExt, AsyncWriteExt};
 use glommio::LocalExecutorBuilder;
 use glommio::net::{TcpListener, TcpStream};
-use mc_protocol::packets::client::{FinishConfiguration, LoginSuccess};
-use mc_protocol::packets::server::{AcknowledgeFinish, LoginAcknowledge, LoginStart, ServerListPing};
-use mc_protocol::packets::{Clientbound, RawPacket, Serverbound};
+use kagami_proxy::{Account, Config, Upstream};
+use mc_protocol::packets::client::{EncryptionRequest, FinishConfiguration, LoginSuccess, SetCompression};
+use mc_protocol::packets::server::{AcknowledgeFinish, EncryptionResponse, LoginAcknowledge, LoginStart, ServerListPing};
+use mc_protocol::packets::{Clientbound, Serverbound};
 use mc_protocol::state::HandshakeIntent;
 use mc_protocol::types::GameProfile;
 use mc_protocol::{PROTOCOL_VERSION, PacketWriter, Payload, State, VarInt};
+use rsa::pkcs8::{DecodePublicKey, EncodePublicKey};
+use rsa::{Pkcs1v15Encrypt, PrivateKey, PublicKey};
 use uuid::Uuid;
 
-/// Clientbound Play ids that change no state; the proxy only reads ids.
+type Encryptor = cfb8::Encryptor<Aes128>;
+type Decryptor = cfb8::Decryptor<Aes128>;
+
+/// Play ids that change no state; the proxy only reads ids.
 const BULK_ID: i32 = 0x2e;
 const ECHO_REQUEST_ID: i32 = 0x1c;
 const ECHO_RESPONSE_ID: i32 = 0x2d;
+/// The client's first Play packet tells the server what to do.
+const SCENARIO_ID: i32 = 0x7a;
 
-const STREAMED_BYTES: usize = 512 * 1024 * 1024;
+const STREAMED_BYTES: usize = 256 * 1024 * 1024;
 const ROUND_TRIPS: usize = 20_000;
 const WRITE_BATCH: usize = 256 * 1024;
+const LARGE_BODY: usize = 16 * 1024;
+const SMALL_BODY: usize = 64;
+const COMPRESSION_THRESHOLD: i32 = 256;
 
-/// The client picks a scenario through its login name.
+/// How the server sets up each connection.
+#[derive(Clone, Copy)]
+struct Wire {
+    name: &'static str,
+    compression: Option<i32>,
+    encryption: bool,
+}
+
+const WIRES: [Wire; 3] = [
+    Wire { name: "plain", compression: None, encryption: false },
+    Wire { name: "compressed", compression: Some(COMPRESSION_THRESHOLD), encryption: false },
+    Wire { name: "online", compression: Some(COMPRESSION_THRESHOLD), encryption: true },
+];
+
 #[derive(Clone, Copy)]
 enum Scenario {
-    /// The server streams frames with this body size.
+    /// The server streams frames with this body size, then closes.
     Stream { body_len: usize },
-    /// The server echoes each fixed-size request.
+    /// The server echoes each request.
     Echo,
 }
 
-impl Scenario {
-    fn name(self) -> String {
-        match self {
-            Scenario::Stream { body_len } => format!("stream{body_len}"),
-            Scenario::Echo => "echo".to_owned(),
-        }
-    }
-
-    fn parse(name: &str) -> Self {
-        match name.strip_prefix("stream") {
-            Some(body_len) => Scenario::Stream { body_len: body_len.parse().unwrap() },
-            None => Scenario::Echo,
-        }
-    }
-}
-
 fn main() {
-    let server = start_on_thread("bench-server", serve_forever);
-    let proxy = free_address();
-    let upstream = kagami_proxy::Upstream { host: server.ip().to_string(), port: server.port() };
-    let config = kagami_proxy::Config { listen: proxy, upstream, account: None };
-    thread::spawn(move || kagami_proxy::run(config).unwrap());
+    let mut routes = Vec::new();
+
+    for wire in WIRES {
+        let server = start_server(wire);
+        let proxy = start_proxy(server, wire);
+        routes.push((wire, server, proxy));
+    }
 
     let executor = LocalExecutorBuilder::default().name("bench-client").make().unwrap();
     executor.run(async move {
-        println!("{:<24}{:>14}{:>14}", "", "direct", "proxied");
+        println!("{:<30}{:>14}{:>14}", "", "direct", "proxied");
 
-        for body_len in [16 * 1024, 64] {
-            let label = format!("throughput {body_len} B");
-            let direct = throughput(server, body_len).await;
-            let proxied = throughput(proxy, body_len).await;
-            println!("{label:<24}{:>9.2} GiB/s{:>9.2} GiB/s", direct, proxied);
+        for (wire, server, proxy) in &routes {
+            for body_len in [LARGE_BODY, SMALL_BODY] {
+                let scenario = Scenario::Stream { body_len };
+                let direct = throughput(*server, *wire, scenario).await;
+                let proxied = throughput(*proxy, *wire, scenario).await;
+                let label = format!("{} {body_len} B packets", wire.name);
+                println!("{label:<30}{direct:>9.2} GiB/s{proxied:>9.2} GiB/s");
+            }
+
+            let direct = latencies(*server, *wire).await;
+            let proxied = latencies(*proxy, *wire).await;
+
+            for (quantile, label) in [(0.50, "p50"), (0.99, "p99")] {
+                let direct = micros(percentile(&direct, quantile));
+                let proxied = micros(percentile(&proxied, quantile));
+                let label = format!("{} round trip {label}", wire.name);
+                println!("{label:<30}{direct:>11.1} µs{proxied:>11.1} µs");
+            }
         }
 
-        let direct = latencies(server).await;
-        let proxied = latencies(proxy).await;
+        // What an uncompressed client leg would cost on top: inflating every
+        // compressed packet from the server.
+        let label = format!("inflating every {LARGE_BODY} B packet");
+        println!("{label:<30}{:>9.2} GiB/s", inflate_rate(LARGE_BODY));
 
-        for (label, quantile) in [("latency p50", 0.50), ("latency p99", 0.99), ("latency p99.9", 0.999)] {
-            let direct = percentile(&direct, quantile);
-            let proxied = percentile(&proxied, quantile);
-            println!("{label:<24}{:>11.1} µs{:>11.1} µs", micros(direct), micros(proxied));
-        }
+        // The online server leg: the proxy decrypts what the server sends and
+        // encrypts what the client sends.
+        let (encrypted, decrypted) = cipher_rates();
+        println!("{:<30}{encrypted:>9.2} GiB/s", "AES-CFB8 encrypting");
+        println!("{:<30}{decrypted:>9.2} GiB/s", "AES-CFB8 decrypting");
     });
 }
 
-/// Streams `STREAMED_BYTES` and returns the client's receive rate in GiB/s.
-async fn throughput(address: SocketAddr, body_len: usize) -> f64 {
-    let mut stream = join(address, Scenario::Stream { body_len }).await;
+/// Streams `STREAMED_BYTES` of packets and returns the rate the client
+/// receives them at, in GiB/s of uncompressed packet bodies.
+async fn throughput(address: SocketAddr, wire: Wire, scenario: Scenario) -> f64 {
+    let Scenario::Stream { body_len } = scenario else {
+        unreachable!("only streams measure throughput");
+    };
+    let mut peer = join(address, wire, scenario).await;
     let mut buffer = vec![0; 256 * 1024];
     let started = Instant::now();
 
-    let mut received = 0;
+    while peer.read(&mut buffer).await > 0 {}
 
-    while received < streamed_frame_count(body_len) * bulk_frame(body_len).len() {
-        let read = stream.read(&mut buffer).await.unwrap();
-        assert!(read > 0, "server closed the stream early");
-        received += read;
-    }
+    let streamed = frame_count(body_len) * body_len;
 
-    received as f64 / started.elapsed().as_secs_f64() / (1u64 << 30) as f64
+    streamed as f64 / started.elapsed().as_secs_f64() / (1u64 << 30) as f64
 }
 
-/// Measures every round trip of a small serverbound request echoed back.
-async fn latencies(address: SocketAddr) -> Vec<Duration> {
-    let mut stream = join(address, Scenario::Echo).await;
-    let request = echo_frame(ECHO_REQUEST_ID);
-    let mut response = vec![0; request.len()];
-
+/// Measures every round trip of a keep-alive sized request echoed back.
+async fn latencies(address: SocketAddr, wire: Wire) -> Vec<Duration> {
+    let mut peer = join(address, wire, Scenario::Echo).await;
+    let request = wire_frame(ECHO_REQUEST_ID, &[0; 8], wire.compression);
+    let mut response = vec![0; wire_frame(ECHO_RESPONSE_ID, &[0; 8], wire.compression).len()];
     let mut samples = Vec::with_capacity(ROUND_TRIPS);
 
     for _ in 0..ROUND_TRIPS {
         let started = Instant::now();
-        stream.write_all(&request).await.unwrap();
-        stream.read_exact(&mut response).await.unwrap();
+        peer.write(&mut request.clone()).await;
+        peer.read_exact(&mut response).await;
         samples.push(started.elapsed());
     }
 
@@ -119,30 +151,54 @@ async fn latencies(address: SocketAddr) -> Vec<Duration> {
     samples
 }
 
-/// Connects and logs in, leaving the client in Play.
-async fn join(address: SocketAddr, scenario: Scenario) -> TcpStream {
-    let mut stream = connect(address).await;
-    stream.set_nodelay(true).unwrap();
+/// Logs in like a client, then asks for `scenario`.
+async fn join(address: SocketAddr, wire: Wire, scenario: Scenario) -> Peer {
+    let mut peer = Peer::new(connect(address).await);
+
     let handshake =
         ServerListPing { version: PROTOCOL_VERSION, addr: "localhost".into(), port: address.port(), next_state: HandshakeIntent::Login };
-    send(&mut stream, &handshake).await;
-    send(&mut stream, &LoginStart { name: scenario.name().into(), uuid: Uuid::nil() }).await;
+    peer.send(&handshake).await;
+    peer.send(&LoginStart { name: "bench".into(), uuid: Uuid::nil() }).await;
 
-    let body = read_body(&mut stream).await;
-    assert!(matches!(Clientbound::decode(State::Login, &body).unwrap(), Clientbound::LoginSuccess(_)));
-    send(&mut stream, &LoginAcknowledge).await;
+    loop {
+        let packet = peer.read_packet().await;
 
-    let body = read_body(&mut stream).await;
-    assert!(matches!(Clientbound::decode(State::Config, &body).unwrap(), Clientbound::FinishConfiguration(_)));
-    send(&mut stream, &AcknowledgeFinish).await;
+        match Clientbound::decode(State::Login, &packet).unwrap() {
+            // Only a direct client sees this: the proxy encrypts the server leg alone.
+            Clientbound::EncryptionRequest(request) => {
+                let secret: [u8; 16] = rand::random();
+                let public_key = PublicKey::from_public_key_der(&request.public_key).unwrap();
+                let mut rng = rand::rng();
+                let shared_secret = public_key.encrypt(&mut rng, Pkcs1v15Encrypt, &secret).unwrap();
+                let verify_token = public_key.encrypt(&mut rng, Pkcs1v15Encrypt, &request.verify_token).unwrap();
 
-    stream
+                peer.send(&EncryptionResponse { shared_secret: shared_secret.into(), verify_token: verify_token.into() }).await;
+                peer.enable_encryption(&secret);
+            }
+            Clientbound::SetCompression(compression) => peer.compression = Some(compression.threshold),
+            Clientbound::LoginSuccess(_) => break,
+            _ => panic!("unexpected login packet"),
+        }
+    }
+
+    assert_eq!(peer.compression, wire.compression);
+    peer.send(&LoginAcknowledge).await;
+
+    let packet = peer.read_packet().await;
+    assert!(matches!(Clientbound::decode(State::Config, &packet).unwrap(), Clientbound::FinishConfiguration(_)));
+    peer.send(&AcknowledgeFinish).await;
+
+    let mut request = wire_frame(SCENARIO_ID, &scenario_payload(scenario), peer.compression);
+    peer.write(&mut request).await;
+
+    peer
 }
 
 /// The proxy starts on its own thread, so retry until it listens.
 async fn connect(address: SocketAddr) -> TcpStream {
-    for _ in 0..100 {
+    for _ in 0..200 {
         if let Ok(stream) = TcpStream::connect(address).await {
+            stream.set_nodelay(true).unwrap();
             return stream;
         }
 
@@ -152,121 +208,318 @@ async fn connect(address: SocketAddr) -> TcpStream {
     panic!("nothing listens on {address}");
 }
 
-async fn serve_forever(listener: TcpListener) {
-    loop {
-        let stream = listener.accept().await.unwrap();
-        glommio::spawn_local(serve(stream)).detach();
-    }
-}
-
-/// A minimal offline server: login, an empty configuration, then the scenario.
-async fn serve(mut stream: TcpStream) {
+/// A minimal server: login, an empty configuration, then the scenario.
+async fn serve(stream: TcpStream, wire: Wire, key: Rc<PrivateKey>) {
     stream.set_nodelay(true).unwrap();
-    let body = read_body(&mut stream).await;
-    let Serverbound::ServerListPing(_) = Serverbound::decode(State::Handshake, &body).unwrap() else {
-        panic!("expected a handshake");
-    };
-    let body = read_body(&mut stream).await;
-    let Serverbound::LoginStart(login) = Serverbound::decode(State::Login, &body).unwrap() else {
-        panic!("expected login start");
-    };
-    let scenario = Scenario::parse(&login.name);
-    let profile = GameProfile { uuid: Uuid::nil(), username: login.name.clone(), properties: vec![] };
-    send(&mut stream, &LoginSuccess { profile, session_id: Uuid::nil() }).await;
-    read_body(&mut stream).await;
-    send(&mut stream, &FinishConfiguration).await;
-    read_body(&mut stream).await;
+    let mut peer = Peer::new(stream);
 
-    match scenario {
-        Scenario::Stream { body_len } => {
-            // Writes whole batches, so small frames do not cost a syscall each.
-            let frame = bulk_frame(body_len);
-            let frames_per_batch = (WRITE_BATCH / frame.len()).max(1);
-            let batch = frame.repeat(frames_per_batch);
-            let mut remaining = streamed_frame_count(body_len);
+    let packet = peer.read_packet().await;
+    assert!(matches!(Serverbound::decode(State::Handshake, &packet).unwrap(), Serverbound::ServerListPing(_)));
+    let packet = peer.read_packet().await;
+    assert!(matches!(Serverbound::decode(State::Login, &packet).unwrap(), Serverbound::LoginStart(_)));
 
-            while remaining > 0 {
-                let frames = remaining.min(frames_per_batch);
-                stream.write_all(&batch[..frames * frame.len()]).await.unwrap();
-                remaining -= frames;
-            }
-        }
-        Scenario::Echo => {
-            let mut request = echo_frame(ECHO_REQUEST_ID);
-            let response = echo_frame(ECHO_RESPONSE_ID);
+    if wire.encryption {
+        encrypt(&mut peer, &key).await;
+    }
 
-            while stream.read_exact(&mut request).await.is_ok() {
-                stream.write_all(&response).await.unwrap();
-            }
-        }
+    if let Some(threshold) = wire.compression {
+        peer.send(&SetCompression { threshold }).await;
+        peer.compression = Some(threshold);
+    }
+
+    let profile = GameProfile { uuid: Uuid::nil(), username: "bench".into(), properties: vec![] };
+    peer.send(&LoginSuccess { profile, session_id: Uuid::nil() }).await;
+    peer.read_packet().await;
+    peer.send(&FinishConfiguration).await;
+    peer.read_packet().await;
+
+    let packet = peer.read_packet().await;
+
+    match parse_scenario(&packet) {
+        Scenario::Stream { body_len } => stream_frames(&mut peer, body_len).await,
+        Scenario::Echo => echo(&mut peer).await,
     }
 }
 
-fn streamed_frame_count(body_len: usize) -> usize {
-    STREAMED_BYTES / bulk_frame(body_len).len()
+/// The server side of the encryption request, without the session check.
+async fn encrypt(peer: &mut Peer, key: &PrivateKey) {
+    let public_key = key.to_public_key().to_public_key_der().unwrap();
+    let verify_token = [1, 2, 3, 4];
+    let request = EncryptionRequest {
+        server_id: "".into(),
+        public_key: public_key.as_bytes().to_vec().into(),
+        verify_token: verify_token.as_slice().into(),
+        should_authenticate: false,
+    };
+    peer.send(&request).await;
+
+    let packet = peer.read_packet().await;
+    let Serverbound::EncryptionResponse(response) = Serverbound::decode(State::Login, &packet).unwrap() else {
+        panic!("expected an encryption response");
+    };
+    assert_eq!(key.decrypt(Pkcs1v15Encrypt, &response.verify_token).unwrap(), verify_token);
+
+    let secret = key.decrypt(Pkcs1v15Encrypt, &response.shared_secret).unwrap();
+    peer.enable_encryption(&secret.try_into().unwrap());
 }
 
-fn bulk_frame(body_len: usize) -> Vec<u8> {
-    raw_frame(BULK_ID, vec![0x55; body_len])
+/// Writes whole batches, so small frames do not cost a syscall each.
+async fn stream_frames(peer: &mut Peer, body_len: usize) {
+    let frame = wire_frame(BULK_ID, &payload(body_len), peer.compression);
+    let frames_per_batch = (WRITE_BATCH / frame.len()).max(1);
+    let batch = frame.repeat(frames_per_batch);
+    let mut remaining = frame_count(body_len);
+
+    while remaining > 0 {
+        let frames = remaining.min(frames_per_batch);
+        let mut bytes = batch[..frames * frame.len()].to_vec();
+        peer.write(&mut bytes).await;
+        remaining -= frames;
+    }
 }
 
-/// A keep-alive sized frame: an id and eight bytes.
-fn echo_frame(id: i32) -> Vec<u8> {
-    raw_frame(id, vec![0; 8])
+async fn echo(peer: &mut Peer) {
+    let mut request = vec![0; wire_frame(ECHO_REQUEST_ID, &[0; 8], peer.compression).len()];
+    let response = wire_frame(ECHO_RESPONSE_ID, &[0; 8], peer.compression);
+
+    while peer.try_read_exact(&mut request).await {
+        peer.write(&mut response.clone()).await;
+    }
 }
 
-fn raw_frame(id: i32, payload: Vec<u8>) -> Vec<u8> {
+/// One end of a connection, with the framing and cipher the login set up.
+struct Peer {
+    stream: TcpStream,
+    compression: Option<i32>,
+    encryptor: Option<Encryptor>,
+    decryptor: Option<Decryptor>,
+}
+
+impl Peer {
+    fn new(stream: TcpStream) -> Self {
+        Self { stream, compression: None, encryptor: None, decryptor: None }
+    }
+
+    fn enable_encryption(&mut self, secret: &[u8; 16]) {
+        self.encryptor = Some(Encryptor::new(secret.into(), secret.into()));
+        self.decryptor = Some(Decryptor::new(secret.into(), secret.into()));
+    }
+
+    async fn send<'p, P: Payload<'p>>(&mut self, packet: &P) {
+        let mut payload = Vec::new();
+        packet.encode_payload(&mut payload).unwrap();
+
+        let mut frame = wire_frame(P::ID.0, &payload, self.compression);
+        self.write(&mut frame).await;
+    }
+
+    async fn write(&mut self, bytes: &mut [u8]) {
+        if let Some(encryptor) = &mut self.encryptor {
+            encryptor.encrypt(bytes);
+        }
+
+        self.stream.write_all(bytes).await.unwrap();
+    }
+
+    /// Reads and decrypts some bytes; zero once the peer closed.
+    async fn read(&mut self, buffer: &mut [u8]) -> usize {
+        let read = self.stream.read(buffer).await.unwrap_or(0);
+
+        if let Some(decryptor) = &mut self.decryptor {
+            decryptor.decrypt(&mut buffer[..read]);
+        }
+
+        read
+    }
+
+    async fn read_exact(&mut self, buffer: &mut [u8]) {
+        assert!(self.try_read_exact(buffer).await, "peer closed the stream early");
+    }
+
+    /// Fills `buffer`, or returns `false` once the peer closed.
+    async fn try_read_exact(&mut self, buffer: &mut [u8]) -> bool {
+        if self.stream.read_exact(buffer).await.is_err() {
+            return false;
+        }
+
+        if let Some(decryptor) = &mut self.decryptor {
+            decryptor.decrypt(buffer);
+        }
+
+        true
+    }
+
+    /// Reads one packet, id then payload. Only used while logging in.
+    async fn read_packet(&mut self) -> Vec<u8> {
+        let mut prefix = Vec::new();
+
+        loop {
+            let mut byte = [0];
+            self.read_exact(&mut byte).await;
+            prefix.push(byte[0]);
+
+            if byte[0] & 0x80 == 0 {
+                break;
+            }
+        }
+
+        let body_len = VarInt::read(&mut prefix.as_slice()).unwrap().0 as usize;
+        let mut body = vec![0; body_len];
+        self.read_exact(&mut body).await;
+
+        if self.compression.is_none() {
+            return body;
+        }
+
+        let mut data = body.as_slice();
+        let data_len = VarInt::read(&mut data).unwrap().0 as usize;
+        if data_len == 0 {
+            return data.to_vec();
+        }
+
+        let mut packet = Vec::with_capacity(data_len);
+        ZlibDecoder::new(data).read_to_end(&mut packet).unwrap();
+
+        packet
+    }
+}
+
+/// A frame in a connection's framing: compressed from the threshold up.
+fn wire_frame(id: i32, payload: &[u8], compression: Option<i32>) -> Vec<u8> {
+    let mut packet = Vec::new();
+    VarInt(id).encode(&mut packet).unwrap();
+    packet.extend_from_slice(payload);
+
+    let body = match compression {
+        None => packet,
+        Some(threshold) if packet.len() < threshold as usize => [&[0], packet.as_slice()].concat(),
+        Some(_) => {
+            let mut body = Vec::new();
+            VarInt(packet.len() as i32).encode(&mut body).unwrap();
+
+            let mut encoder = ZlibEncoder::new(body, Compression::default());
+            encoder.write_all(&packet).unwrap();
+            encoder.finish().unwrap()
+        }
+    };
+
     let mut frame = Vec::new();
-    RawPacket { id, payload: payload.into() }.encode(&mut frame).unwrap();
+    VarInt(body.len() as i32).encode(&mut frame).unwrap();
+    frame.extend_from_slice(&body);
 
     frame
 }
 
-async fn send<'p>(stream: &mut TcpStream, packet: &impl Payload<'p>) {
-    let mut frame = Vec::new();
-    packet.encode(&mut frame).unwrap();
-    stream.write_all(&frame).await.unwrap();
+/// Packet bodies that compress to about half, like chunk data.
+fn payload(len: usize) -> Vec<u8> {
+    let mut state = 0x2545_f491_u32;
+
+    (0..len)
+        .map(|_| {
+            state = state.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+            (state >> 24) as u8 & 0x0f
+        })
+        .collect()
 }
 
-/// Reads one frame and returns its body. Only used while logging in.
-async fn read_body(stream: &mut TcpStream) -> Vec<u8> {
-    let mut prefix = Vec::new();
+fn frame_count(body_len: usize) -> usize {
+    STREAMED_BYTES / body_len
+}
 
-    loop {
-        let mut byte = [0];
-        stream.read_exact(&mut byte).await.unwrap();
-        prefix.push(byte[0]);
+fn scenario_payload(scenario: Scenario) -> Vec<u8> {
+    match scenario {
+        Scenario::Stream { body_len } => [&[0], (body_len as u32).to_be_bytes().as_slice()].concat(),
+        Scenario::Echo => vec![1],
+    }
+}
 
-        if byte[0] & 0x80 == 0 {
-            break;
-        }
+fn parse_scenario(packet: &[u8]) -> Scenario {
+    let mut payload = packet;
+    assert_eq!(VarInt::read(&mut payload).unwrap().0, SCENARIO_ID);
+
+    match payload[0] {
+        0 => Scenario::Stream { body_len: u32::from_be_bytes(payload[1..5].try_into().unwrap()) as usize },
+        _ => Scenario::Echo,
+    }
+}
+
+/// How fast one thread inflates the packets of a compressed large stream.
+fn inflate_rate(body_len: usize) -> f64 {
+    let frame = wire_frame(BULK_ID, &payload(body_len), Some(COMPRESSION_THRESHOLD));
+    let mut data = &frame[..];
+    VarInt::read(&mut data).unwrap();
+    VarInt::read(&mut data).unwrap();
+
+    let frames = frame_count(body_len) / 4;
+    let mut packet = Vec::with_capacity(body_len + 8);
+    let started = Instant::now();
+
+    for _ in 0..frames {
+        packet.clear();
+        ZlibDecoder::new(data).read_to_end(&mut packet).unwrap();
     }
 
-    let body_len = VarInt::read(&mut prefix.as_slice()).unwrap().0 as usize;
-    let mut body = vec![0; body_len];
-    stream.read_exact(&mut body).await.unwrap();
-
-    body
+    (frames * body_len) as f64 / started.elapsed().as_secs_f64() / (1u64 << 30) as f64
 }
 
-/// Runs `serve` on a new thread with its own executor, listening on a free port.
-fn start_on_thread<F: Future<Output = ()> + 'static>(name: &'static str, serve: fn(TcpListener) -> F) -> SocketAddr {
+/// How fast one thread encrypts and decrypts in place, in GiB/s.
+fn cipher_rates() -> (f64, f64) {
+    let secret = [7; 16];
+    let mut bytes = payload(64 * 1024 * 1024);
+    let gibibytes = bytes.len() as f64 / (1u64 << 30) as f64;
+
+    let started = Instant::now();
+    Encryptor::new(&secret.into(), &secret.into()).encrypt(&mut bytes);
+    let encrypted = gibibytes / started.elapsed().as_secs_f64();
+
+    let started = Instant::now();
+    Decryptor::new(&secret.into(), &secret.into()).decrypt(&mut bytes);
+    let decrypted = gibibytes / started.elapsed().as_secs_f64();
+
+    (encrypted, decrypted)
+}
+
+fn start_server(wire: Wire) -> SocketAddr {
     let address = free_address();
+
     thread::spawn(move || {
-        let executor = LocalExecutorBuilder::default().name(name).make().unwrap();
-        executor.run(async move { serve(TcpListener::bind(address).unwrap()).await });
+        let key = Rc::new(PrivateKey::new(&mut rand::rng(), 1024).unwrap());
+        let executor = LocalExecutorBuilder::default().name("bench-server").make().unwrap();
+
+        executor.run(async move {
+            let listener = TcpListener::bind(address).unwrap();
+
+            loop {
+                let stream = listener.accept().await.unwrap();
+                glommio::spawn_local(serve(stream, wire, key.clone())).detach();
+            }
+        });
     });
 
     address
 }
 
+/// An online proxy logs in with a dummy account: the bench server does not
+/// ask for the session check.
+fn start_proxy(server: SocketAddr, wire: Wire) -> SocketAddr {
+    let listen = free_address();
+    let account = wire.encryption.then(|| Account { access_token: String::new(), uuid: Uuid::nil(), name: "bench".to_owned() });
+    let upstream = Upstream { host: server.ip().to_string(), port: server.port() };
+
+    thread::spawn(move || kagami_proxy::run(Config { listen, upstream, account }).unwrap());
+
+    listen
+}
+
 fn free_address() -> SocketAddr {
     let listener = StdTcpListener::bind("127.0.0.1:0").unwrap();
+
     listener.local_addr().unwrap()
 }
 
 fn percentile(sorted: &[Duration], quantile: f64) -> Duration {
     let index = ((sorted.len() - 1) as f64 * quantile).round() as usize;
+
     sorted[index]
 }
 
