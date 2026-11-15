@@ -7,6 +7,7 @@ use flate2::{Decompress, FlushDecompress};
 use mc_protocol::{PacketWriter, VarInt};
 
 use crate::invalid_data;
+use crate::transition::STATE_CHANGE_LEN;
 
 /// The largest packet vanilla accepts once inflated.
 const MAX_INFLATED_LEN: usize = 8 * 1024 * 1024;
@@ -54,18 +55,26 @@ impl Inflater {
         Self { stream: Decompress::new(true) }
     }
 
-    /// Reads the packet id of a frame body, inflating only its first bytes.
-    pub fn packet_id(&mut self, body: &[u8]) -> io::Result<i32> {
+    /// Reads the packet id of a frame body, inflating only its first bytes
+    /// when it is deflated. Returns `None` instead of inflating when no
+    /// packet is `wanted` in the frame's direction and state and the packet
+    /// is too long to change the state: then its id changes nothing, and
+    /// inflating costs far more than the rest of the frame's walk.
+    pub fn packet_id(&mut self, body: &[u8], wanted: bool) -> io::Result<Option<i32>> {
         let (data_len, mut data) = split_data_length(body)?;
         if data_len == 0 {
-            return Ok(VarInt::read(&mut data).map_err(invalid_data)?.0);
+            return Ok(Some(VarInt::read(&mut data).map_err(invalid_data)?.0));
+        }
+
+        if !wanted && data_len > STATE_CHANGE_LEN {
+            return Ok(None);
         }
 
         let mut head = [0; MAX_ID_LEN];
         let produced = self.inflate_into(data, &mut head)?;
         let mut head = &head[..produced];
 
-        Ok(VarInt::read(&mut head).map_err(invalid_data)?.0)
+        Ok(Some(VarInt::read(&mut head).map_err(invalid_data)?.0))
     }
 
     /// Returns the packet of a frame body, id then payload. A compressed

@@ -139,8 +139,15 @@ impl<S, H: Handlers<S>> Pump<S, H> {
 
             let body = &bytes[run + header.header_len..frame_end];
             let id = match &mut self.inflater {
-                Some(inflater) => inflater.packet_id(body)?,
-                None => VarInt::read(&mut &body[..]).map_err(invalid_data)?.0,
+                Some(inflater) => {
+                    let wanted = self.interest.any(self.direction, self.state);
+                    inflater.packet_id(body, wanted)?
+                }
+                None => Some(VarInt::read(&mut &body[..]).map_err(invalid_data)?.0),
+            };
+            let Some(id) = id else {
+                run = frame_end;
+                continue;
             };
             // Ids past a byte belong to no known packet: no handler, no state change.
             let Ok(id) = u8::try_from(id) else {

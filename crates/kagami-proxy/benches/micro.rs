@@ -85,9 +85,13 @@ async fn passthrough() {
     let mut scanner = play_scanner(Direction::Clientbound, compressed, ()).await;
     report_scan("64 B, compressed framing", &mut scanner, &small);
 
-    // Above the threshold, the id hides in the deflate stream.
+    // Above the threshold, the id hides in the deflate stream. It is only
+    // read when something wants packets in the same direction and state.
     let deflated = wire_frame(BULK_ID, &payload(1024), compressed);
     let mut scanner = play_scanner(Direction::Clientbound, compressed, ()).await;
+    report_scan("1 KiB deflated, no handlers", &mut scanner, &deflated);
+
+    let mut scanner = play_scanner(Direction::Clientbound, compressed, Always::<PlayKeepAlive>::new(Action::Forward)).await;
     report_scan("1 KiB deflated, id peeked", &mut scanner, &deflated);
 }
 

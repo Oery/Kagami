@@ -21,13 +21,24 @@ fn compressed_body(packet: &[u8]) -> Vec<u8> {
 #[test]
 fn ids_are_read_from_uncompressed_and_compressed_bodies() {
     let mut inflater = Inflater::new();
-    assert_eq!(inflater.packet_id(&[0, 0x2e, 1, 2]).unwrap(), 0x2e);
+    assert_eq!(inflater.packet_id(&[0, 0x2e, 1, 2], true).unwrap(), Some(0x2e));
 
     let mut packet = vec![0x80, 0x01];
     packet.extend(std::iter::repeat_n(7, 1000));
-    assert_eq!(inflater.packet_id(&compressed_body(&packet)).unwrap(), 128);
+    assert_eq!(inflater.packet_id(&compressed_body(&packet), true).unwrap(), Some(128));
     // The stream is reset between frames.
-    assert_eq!(inflater.packet_id(&compressed_body(&[0x03])).unwrap(), 0x03);
+    assert_eq!(inflater.packet_id(&compressed_body(&[0x03]), true).unwrap(), Some(0x03));
+}
+
+#[test]
+fn unwanted_ids_are_only_inflated_when_they_could_change_the_state() {
+    let mut inflater = Inflater::new();
+    let mut packet = vec![0x2e];
+    packet.extend(std::iter::repeat_n(7, 1000));
+
+    assert_eq!(inflater.packet_id(&compressed_body(&packet), false).unwrap(), None);
+    assert_eq!(inflater.packet_id(&compressed_body(&[0x03]), false).unwrap(), Some(0x03));
+    assert_eq!(inflater.packet_id(&[0, 0x2e, 1, 2], false).unwrap(), Some(0x2e));
 }
 
 #[test]

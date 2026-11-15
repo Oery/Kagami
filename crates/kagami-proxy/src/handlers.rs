@@ -89,6 +89,13 @@ impl Interest {
         self.bits[direction as usize][state as usize][word] & bit != 0
     }
 
+    /// Whether any packet of `direction` in `state` is in the set.
+    pub const fn any(&self, direction: Direction, state: State) -> bool {
+        let words = self.bits[direction as usize][state as usize];
+
+        words[0] | words[1] | words[2] | words[3] != 0
+    }
+
     const fn position(id: u8) -> (usize, u64) {
         (id as usize / 64, 1 << (id % 64))
     }
