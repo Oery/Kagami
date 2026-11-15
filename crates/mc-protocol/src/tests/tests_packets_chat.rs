@@ -9,8 +9,8 @@ fn seen() -> LastSeen {
 
 #[test]
 fn chat_decodes_signed_and_unsigned_and_rejects_truncated_metadata() {
-    for signature in [None, Some(Signature(&[7; 256]))] {
-        let packet = ChatMessage { message: ChatText("Hello, 世界!"), timestamp: 12, salt: 42, signature, seen: seen() };
+    for signature in [None, Some(Signature((&[7; 256]).into()))] {
+        let packet = ChatMessage { message: ChatText("Hello, 世界!".into()), timestamp: 12, salt: 42, signature, seen: seen() };
         let mut body = Vec::new();
         packet.encode_payload(&mut body).unwrap();
         assert_eq!(packet.payload_len().unwrap(), body.len());
@@ -32,10 +32,10 @@ fn chat_decodes_signed_and_unsigned_and_rejects_truncated_metadata() {
 #[test]
 fn signed_command_consumes_fixed_signatures_and_checksum() {
     let packet = SignedChatCommand {
-        command: "msg Alex hello there",
+        command: "msg Alex hello there".into(),
         timestamp: 1,
         salt: 2,
-        signatures: ArgumentSignatures(vec![("message", Signature(&[3; 256]))]),
+        signatures: ArgumentSignatures(vec![("message".into(), Signature((&[3; 256]).into()))]),
         seen: seen(),
     };
     let mut body = Vec::new();
@@ -44,7 +44,7 @@ fn signed_command_consumes_fixed_signatures_and_checksum() {
     let mut input = body.as_slice();
     let decoded = SignedChatCommand::decode_payload(&mut input).unwrap();
     assert_eq!(decoded.command, packet.command);
-    assert_eq!(decoded.signatures.0[0].1.0, &[3; 256]);
+    assert_eq!(*decoded.signatures.0[0].1.0, [3; 256]);
     assert!(input.is_empty());
     assert!(ArgumentSignatures::read(&mut [9].as_slice()).is_err());
     assert!(ArgumentSignatures::read(&mut [1, 49].as_slice()).is_err());

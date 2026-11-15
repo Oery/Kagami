@@ -1,4 +1,5 @@
 use super::*;
+use std::borrow::Cow;
 
 #[test]
 fn empty_text_omits_the_extra_list_and_encodes_a_literal_empty_component() {
@@ -6,14 +7,14 @@ fn empty_text_omits_the_extra_list_and_encodes_a_literal_empty_component() {
     assert_eq!(text.validate(), Ok(()));
     let nbt = text.nbt();
     assert_eq!(fields(&nbt).len(), 1);
-    assert!(matches!(field(&nbt, "text"), Nbt::Str("")));
+    assert!(matches!(field(&nbt, "text"), Nbt::Str(text) if text.is_empty()));
     let mut bytes = Vec::new();
     nbt.encode(&mut bytes).unwrap();
     assert_eq!(bytes, b"\x0a\x08\x00\x04text\x00\x00\x00");
     assert_eq!(nbt.body_len(), bytes.len());
 }
 
-fn fields<'a>(nbt: &'a Nbt<'a>) -> &'a [(&'a str, Nbt<'a>)] {
+fn fields<'a>(nbt: &'a Nbt<'a>) -> &'a [(Cow<'a, str>, Nbt<'a>)] {
     let Nbt::Compound(fields) = nbt else {
         panic!("expected a compound")
     };
@@ -21,7 +22,7 @@ fn fields<'a>(nbt: &'a Nbt<'a>) -> &'a [(&'a str, Nbt<'a>)] {
 }
 
 fn field<'a>(nbt: &'a Nbt<'a>, name: &str) -> &'a Nbt<'a> {
-    &fields(nbt).iter().find(|(key, _)| *key == name).unwrap().1
+    &fields(nbt).iter().find(|(key, _)| key == name).unwrap().1
 }
 
 #[test]
@@ -33,12 +34,12 @@ fn builder_spans_keep_their_order_and_styles() {
         panic!("expected extra spans")
     };
     assert_eq!(extra.len(), 3);
-    assert!(matches!(field(&extra[0], "color"), Nbt::Str("gold")));
+    assert!(matches!(field(&extra[0], "color"), Nbt::Str(text) if text == "gold"));
     assert!(matches!(field(&extra[0], "bold"), Nbt::Bool(false)));
-    assert!(!fields(&extra[1]).iter().any(|(key, _)| *key == "color"));
-    assert!(matches!(field(&extra[2], "color"), Nbt::Str("yellow")));
+    assert!(!fields(&extra[1]).iter().any(|(key, _)| key == "color"));
+    assert!(matches!(field(&extra[2], "color"), Nbt::Str(text) if text == "yellow"));
     assert!(matches!(field(&extra[2], "bold"), Nbt::Bool(true)));
-    assert!(matches!(field(&extra[2], "text"), Nbt::Str("Steve")));
+    assert!(matches!(field(&extra[2], "text"), Nbt::Str(text) if text == "Steve"));
     assert_eq!(text.validate(), Ok(()));
 }
 

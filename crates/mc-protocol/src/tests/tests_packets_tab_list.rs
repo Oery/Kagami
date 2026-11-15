@@ -4,10 +4,10 @@ use crate::{PacketWriter, Payload, VarInt};
 #[test]
 fn tab_list_encodes_two_anonymous_nbt_components_with_exact_lengths() {
     for (header, footer, expected) in [
-        (Nbt::Str("Hi"), Nbt::Str("Bye"), &b"\x08\x00\x02Hi\x08\x00\x03Bye"[..]),
+        (Nbt::Str("Hi".into()), Nbt::Str("Bye".into()), &b"\x08\x00\x02Hi\x08\x00\x03Bye"[..]),
         (
-            Nbt::Compound(vec![("text", Nbt::Str(""))]),
-            Nbt::Compound(vec![("text", Nbt::Str(""))]),
+            Nbt::Compound(vec![("text".into(), Nbt::Str("".into()))]),
+            Nbt::Compound(vec![("text".into(), Nbt::Str("".into()))]),
             &b"\x0a\x08\x00\x04text\x00\x00\x00\x0a\x08\x00\x04text\x00\x00\x00"[..],
         ),
     ] {

@@ -1,5 +1,7 @@
 //! Protocol 777 presentation team creation and removal.
-use mc_protocol_macros::packet;
+use std::borrow::Cow;
+
+use mc_protocol_macros::{IntoOwned, packet};
 
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
@@ -7,7 +9,7 @@ use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 use crate::types::{Nbt, VarInt};
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct TeamProperties<'p> {
     pub display_name: Nbt<'p>,
     pub prefix: Nbt<'p>,
@@ -17,10 +19,10 @@ pub struct TeamProperties<'p> {
     /// 26.3 encodes a presence boolean before the color ID (0..=15).
     pub color: Option<VarInt>,
     pub friendly_flags: u8,
-    pub entities: Vec<&'p str>,
+    pub entities: Vec<Cow<'p, str>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub enum TeamAction<'p> {
     Create(TeamProperties<'p>),
     Remove,
@@ -78,7 +80,7 @@ impl<'p> PacketWriter<'p> for TeamAction<'p> {
 
 #[packet(Play, 0x6F, Clientbound)]
 pub struct SetPlayerTeam<'p> {
-    pub name: &'p str,
+    pub name: Cow<'p, str>,
     pub action: TeamAction<'p>,
 }
 

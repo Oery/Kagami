@@ -1,6 +1,7 @@
 //! Cosmetic protocol 777 feedback: swings, entity animations, sounds and particles.
+use std::borrow::Cow;
 
-use mc_protocol_macros::packet;
+use mc_protocol_macros::{IntoOwned, packet};
 
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
@@ -55,9 +56,9 @@ pub struct EntityAnimation {
 
 /// An inline `Holder<SoundEvent>`: zero instead of `registry ID + 1`, then the
 /// direct definition. This avoids shipping the sound-event registry table.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, IntoOwned)]
 pub struct InlineSound<'p> {
-    pub name: &'p str,
+    pub name: Cow<'p, str>,
     pub fixed_range: Option<f32>,
 }
 
@@ -66,7 +67,7 @@ impl<'p> PacketWriter<'p> for InlineSound<'p> {
         if VarInt::read(buf)?.0 != 0 {
             return Err(crate::error::DecodeError::EnumOutOfRange);
         }
-        Ok(Self { name: <&str>::read(buf)?, fixed_range: Option::read(buf)? })
+        Ok(Self { name: Cow::read(buf)?, fixed_range: Option::read(buf)? })
     }
 
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
@@ -117,10 +118,10 @@ pub struct EntitySoundEffect<'p> {
 }
 
 /// An absent category or identifier matches every category or sound respectively.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, IntoOwned)]
 pub struct StopSound<'p> {
     pub category: Option<i32>,
-    pub name: Option<&'p str>,
+    pub name: Option<Cow<'p, str>>,
 }
 
 impl<'p> Payload<'p> for StopSound<'p> {
@@ -129,7 +130,7 @@ impl<'p> Payload<'p> for StopSound<'p> {
     const STATE: State = State::Play;
 
     fn payload_len(&self) -> EncodeResult<usize> {
-        Ok(1 + self.category.map_or(0, |category| VarInt(category).body_len()) + self.name.map_or(0, |name| name.body_len()))
+        Ok(1 + self.category.map_or(0, |category| VarInt(category).body_len()) + self.name.as_ref().map_or(0, |name| name.body_len()))
     }
 
     fn decode_payload(buf: &mut &'p [u8]) -> DecodeResult<Self> {
@@ -142,7 +143,7 @@ impl<'p> Payload<'p> for StopSound<'p> {
         } else {
             None
         };
-        let name = if flags & 2 != 0 { Some(<&str>::read(buf)?) } else { None };
+        let name = if flags & 2 != 0 { Some(Cow::read(buf)?) } else { None };
         Ok(Self { category, name })
     }
 
@@ -152,7 +153,7 @@ impl<'p> Payload<'p> for StopSound<'p> {
         if let Some(category) = self.category {
             VarInt(category).encode(out)?;
         }
-        if let Some(name) = self.name {
+        if let Some(name) = &self.name {
             name.encode(out)?;
         }
         Ok(())
@@ -237,16 +238,16 @@ pub mod attribute {
     pub const SAFE_FALL_DISTANCE: i32 = 29;
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, IntoOwned)]
 pub struct AttributeModifier<'p> {
-    pub id: &'p str,
+    pub id: Cow<'p, str>,
     pub amount: f64,
     pub operation: u8,
 }
 
 impl<'p> PacketWriter<'p> for AttributeModifier<'p> {
     fn read(buf: &mut &'p [u8]) -> DecodeResult<Self> {
-        Ok(Self { id: <&str>::read(buf)?, amount: f64::read(buf)?, operation: u8::read(buf)? })
+        Ok(Self { id: Cow::read(buf)?, amount: f64::read(buf)?, operation: u8::read(buf)? })
     }
 
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
@@ -262,7 +263,7 @@ impl<'p> PacketWriter<'p> for AttributeModifier<'p> {
 
 /// One attribute's base and complete modifier set. The client replaces all
 /// of the attribute's modifiers, including ones it added itself.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, IntoOwned)]
 pub struct AttributeSnapshot<'p> {
     pub attribute: i32,
     pub base: f64,

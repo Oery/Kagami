@@ -6,7 +6,7 @@ use crate::{PacketWriter, Payload, State, VarInt};
 
 #[test]
 fn greedy_text_command_nodes_use_brigadier_string_mode_two() {
-    let node = CommandNode { kind: CommandNodeKind::GreedyText { name: "message" }, children: vec![], executable: true };
+    let node = CommandNode { kind: CommandNodeKind::GreedyText { name: "message".into() }, children: vec![], executable: true };
     let mut body = Vec::new();
     node.encode(&mut body).unwrap();
     assert_eq!(node.body_len(), body.len());
@@ -28,9 +28,10 @@ fn encode<'p>(packet: &impl Payload<'p>) -> Vec<u8> {
 
 #[test]
 fn commands_and_completion_requests_dispatch_only_in_play() {
-    for packet in
-        [encode(&ChatCommand { command: "gamemode 1" }), encode(&CommandSuggestion { transaction_id: 42, text: "/gamemode creative Pl" })]
-    {
+    for packet in [
+        encode(&ChatCommand { command: "gamemode 1".into() }),
+        encode(&CommandSuggestion { transaction_id: 42, text: "/gamemode creative Pl".into() }),
+    ] {
         let mut input = packet.as_slice();
         VarInt::read(&mut input).unwrap();
         let ctx = Context { state: State::Play, ..Default::default() };
@@ -56,8 +57,8 @@ fn commands_and_completion_requests_dispatch_only_in_play() {
 fn command_tree_and_suggestions_use_brigadier_wire_fields() {
     let packet = Commands {
         nodes: vec![
-            CommandNode { kind: CommandNodeKind::Word { name: "player", suggest: true }, children: vec![], executable: true },
-            CommandNode { kind: CommandNodeKind::Literal("creative"), children: vec![VarInt(0)], executable: true },
+            CommandNode { kind: CommandNodeKind::Word { name: "player".into(), suggest: true }, children: vec![], executable: true },
+            CommandNode { kind: CommandNodeKind::Literal("creative".into()), children: vec![VarInt(0)], executable: true },
             CommandNode { kind: CommandNodeKind::Root, children: vec![VarInt(1)], executable: false },
         ],
         root_index: 2,
@@ -71,12 +72,16 @@ fn command_tree_and_suggestions_use_brigadier_wire_fields() {
     let decoded = Commands::decode_payload(&mut input).unwrap();
     assert!(input.is_empty());
     assert_eq!(decoded.root_index, 2);
-    assert_eq!(decoded.nodes[0].kind, CommandNodeKind::Word { name: "player", suggest: true });
+    assert_eq!(decoded.nodes[0].kind, CommandNodeKind::Word { name: "player".into(), suggest: true });
     assert_eq!(decoded.nodes[1].children[0].0, 0);
     assert_eq!(decoded.nodes[2].kind, CommandNodeKind::Root);
 
-    let bytes =
-        encode(&CommandSuggestionsResponse { transaction_id: 42, start: 10, length: 2, matches: vec![CommandMatch { text: "Player" }] });
+    let bytes = encode(&CommandSuggestionsResponse {
+        transaction_id: 42,
+        start: 10,
+        length: 2,
+        matches: vec![CommandMatch { text: "Player".into() }],
+    });
     let mut input = bytes.as_slice();
     VarInt::read(&mut input).unwrap();
     assert_eq!(VarInt::read(&mut input).unwrap().0, 0x0f);
@@ -89,15 +94,15 @@ fn command_tree_and_suggestions_use_brigadier_wire_fields() {
 #[test]
 fn feedback_encodes_network_nbt() {
     assert_eq!(
-        encode(&SystemChatMessage { content: Nbt::Str("ok"), overlay: false }),
+        encode(&SystemChatMessage { content: Nbt::Str("ok".into()), overlay: false }),
         [7, 0x7c, 8, 0, 2, b'o', b'k', 0]
     );
     assert_eq!(
-        encode(&SystemChatMessage { content: Nbt::Str("ok"), overlay: true }),
+        encode(&SystemChatMessage { content: Nbt::Str("ok".into()), overlay: true }),
         [7, 0x7c, 8, 0, 2, b'o', b'k', 1]
     );
-    assert_eq!(encode(&SetTitleText { text: Nbt::Str("ok") }), [6, 0x74, 8, 0, 2, b'o', b'k']);
-    assert_eq!(encode(&SetSubtitleText { text: Nbt::Str("") }), [4, 0x72, 8, 0, 0]);
+    assert_eq!(encode(&SetTitleText { text: Nbt::Str("ok".into()) }), [6, 0x74, 8, 0, 2, b'o', b'k']);
+    assert_eq!(encode(&SetSubtitleText { text: Nbt::Str("".into()) }), [4, 0x72, 8, 0, 0]);
     assert_eq!(
         encode(&SetTitlesAnimation { fade_in: 10, stay: 70, fade_out: 20 }),
         [13, 0x75, 0, 0, 0, 10, 0, 0, 0, 70, 0, 0, 0, 20]
@@ -111,14 +116,14 @@ fn numeric_command_arguments_encode_the_native_parser_ids_and_unbounded_flags() 
         [(1, CommandNumberKind::Float), (2, CommandNumberKind::Double), (3, CommandNumberKind::Integer), (4, CommandNumberKind::Long)]
     {
         let packet = Commands {
-            nodes: vec![CommandNode { kind: CommandNodeKind::Number { name: "n", kind }, children: vec![], executable: true }],
+            nodes: vec![CommandNode { kind: CommandNodeKind::Number { name: "n".into(), kind }, children: vec![], executable: true }],
             root_index: 0,
         };
         let bytes = encode(&packet);
         assert_eq!(&bytes[2..], &[1, 6, 0, 1, b'n', parser, 0, 0]);
         let mut input = &bytes[2..];
         let decoded = Commands::decode_payload(&mut input).unwrap();
-        assert_eq!(decoded.nodes[0].kind, CommandNodeKind::Number { name: "n", kind });
+        assert_eq!(decoded.nodes[0].kind, CommandNodeKind::Number { name: "n".into(), kind });
         assert!(input.is_empty());
     }
 }
@@ -126,13 +131,13 @@ fn numeric_command_arguments_encode_the_native_parser_ids_and_unbounded_flags() 
 #[test]
 fn position_command_arguments_use_the_vec3_singleton_parser() {
     let packet = Commands {
-        nodes: vec![CommandNode { kind: CommandNodeKind::Position { name: "p" }, children: vec![], executable: true }],
+        nodes: vec![CommandNode { kind: CommandNodeKind::Position { name: "p".into() }, children: vec![], executable: true }],
         root_index: 0,
     };
     let bytes = encode(&packet);
     assert_eq!(&bytes[2..], &[1, 6, 0, 1, b'p', 10, 0]);
     let mut input = &bytes[2..];
     let decoded = Commands::decode_payload(&mut input).unwrap();
-    assert_eq!(decoded.nodes[0].kind, CommandNodeKind::Position { name: "p" });
+    assert_eq!(decoded.nodes[0].kind, CommandNodeKind::Position { name: "p".into() });
     assert!(input.is_empty());
 }

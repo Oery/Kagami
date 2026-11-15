@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::decode::{MAX_COLLECTION_LEN, read_length, take};
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
@@ -23,6 +25,20 @@ impl<'p> PacketWriter<'p> for &'p str {
 
     fn body_len(&self) -> usize {
         self.len() + VarInt(self.len() as i32).body_len()
+    }
+}
+
+impl<'p> PacketWriter<'p> for Cow<'p, str> {
+    fn read(input: &mut &'p [u8]) -> Result<Self, DecodeError> {
+        Ok(Cow::Borrowed(<&str>::read(input)?))
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.as_ref().encode(out)
+    }
+
+    fn body_len(&self) -> usize {
+        self.as_ref().body_len()
     }
 }
 

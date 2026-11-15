@@ -1,7 +1,9 @@
+use mc_protocol_macros::IntoOwned;
+
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct SkinParts(pub u8);
 
 impl PacketWriter<'_> for SkinParts {

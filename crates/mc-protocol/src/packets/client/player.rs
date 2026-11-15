@@ -1,4 +1,5 @@
 //! The Play login packet.
+use std::borrow::Cow;
 
 use mc_protocol_macros::packet;
 
@@ -8,7 +9,7 @@ use super::DeathLocation;
 pub struct PlayLogin<'p> {
     pub entity_id: i32,
     pub hardcore: bool,
-    pub dimension_names: Vec<&'p str>,
+    pub dimension_names: Vec<Cow<'p, str>>,
     #[format = "varint"]
     pub max_players: i32,
     #[format = "varint"]
@@ -20,7 +21,7 @@ pub struct PlayLogin<'p> {
     pub do_limited_crafting: bool,
     #[format = "varint"]
     pub dimension_type: i32,
-    pub dimension_name: &'p str,
+    pub dimension_name: Cow<'p, str>,
     pub hashed_seed: i64,
     #[format = "varint"]
     pub game_mode: i32,

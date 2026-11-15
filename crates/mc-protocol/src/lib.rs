@@ -7,11 +7,13 @@ pub mod decode;
 pub mod direction;
 pub mod encode;
 pub mod error;
+pub mod owned;
 pub mod packets;
 pub mod state;
 pub mod types;
 
 pub use crate::direction::Direction;
+pub use crate::owned::IntoOwned;
 pub use crate::packets::{PacketWriter, Payload};
 pub use crate::state::State;
 pub use crate::types::VarInt;

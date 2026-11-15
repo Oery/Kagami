@@ -1,6 +1,8 @@
+use mc_protocol_macros::IntoOwned;
+
 use crate::error::DecodeError;
 
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, IntoOwned)]
 pub enum ChatMode {
     #[default]
     Enabled,

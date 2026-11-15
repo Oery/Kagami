@@ -1,5 +1,7 @@
 //! Protocol 777 scoreboard objectives, display slots and score entries.
-use mc_protocol_macros::packet;
+use std::borrow::Cow;
+
+use mc_protocol_macros::{IntoOwned, packet};
 
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
@@ -7,7 +9,7 @@ use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 use crate::types::{Nbt, VarInt};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, IntoOwned)]
 pub enum ScoreRender {
     #[default]
     Integer,
@@ -33,7 +35,7 @@ impl PacketWriter<'_> for ScoreRender {
 }
 
 /// Styled carries a style compound; Fixed carries a text component.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, IntoOwned)]
 pub enum ScoreNumberFormat<'p> {
     Blank,
     Styled(Nbt<'p>),
@@ -72,14 +74,14 @@ impl<'p> PacketWriter<'p> for ScoreNumberFormat<'p> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct ObjectiveProperties<'p> {
     pub title: Nbt<'p>,
     pub render: ScoreRender,
     pub number_format: Option<ScoreNumberFormat<'p>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub enum ObjectiveAction<'p> {
     Create(ObjectiveProperties<'p>),
     Remove,
@@ -128,7 +130,7 @@ impl<'p> PacketWriter<'p> for ObjectiveAction<'p> {
 
 #[packet(Play, 0x6C, Clientbound)]
 pub struct SetObjective<'p> {
-    pub name: &'p str,
+    pub name: Cow<'p, str>,
     pub action: ObjectiveAction<'p>,
 }
 
@@ -138,13 +140,13 @@ pub struct SetObjective<'p> {
 pub struct SetDisplayObjective<'p> {
     #[format = "varint"]
     pub slot: i32,
-    pub name: &'p str,
+    pub name: Cow<'p, str>,
 }
 
 #[packet(Play, 0x70, Clientbound)]
 pub struct SetScore<'p> {
-    pub holder: &'p str,
-    pub objective: &'p str,
+    pub holder: Cow<'p, str>,
+    pub objective: Cow<'p, str>,
     #[format = "varint"]
     pub value: i32,
     pub display: Option<Nbt<'p>>,
@@ -154,8 +156,8 @@ pub struct SetScore<'p> {
 /// `None` removes this holder's scores from every objective.
 #[packet(Play, 0x50, Clientbound)]
 pub struct ResetScore<'p> {
-    pub holder: &'p str,
-    pub objective: Option<&'p str>,
+    pub holder: Cow<'p, str>,
+    pub objective: Option<Cow<'p, str>>,
 }
 
 #[cfg(test)]

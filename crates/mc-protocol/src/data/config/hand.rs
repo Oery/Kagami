@@ -1,6 +1,8 @@
+use mc_protocol_macros::IntoOwned;
+
 use crate::error::DecodeError;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, IntoOwned)]
 pub enum Hand {
     Left,
     Right,

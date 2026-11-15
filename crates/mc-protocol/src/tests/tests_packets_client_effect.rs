@@ -1,4 +1,5 @@
 use super::*;
+use std::borrow::Cow;
 
 fn encode<'p>(packet: &impl Payload<'p>) -> Vec<u8> {
     let mut bytes = Vec::new();
@@ -16,7 +17,7 @@ fn swing_animation_carries_hand_kind_and_duration() {
 #[test]
 fn inline_sound_event_round_trips_without_a_registry_id() {
     let packet = SoundEffect {
-        sound: InlineSound { name: "a:b", fixed_range: None },
+        sound: InlineSound { name: "a:b".into(), fixed_range: None },
         category: sound_category::PLAYER,
         x: 8,
         y: -16,
@@ -32,7 +33,8 @@ fn inline_sound_event_round_trips_without_a_registry_id() {
     assert_eq!(&bytes[bytes.len() - 8..], 7i64.to_be_bytes());
     let mut input = bytes.as_slice();
     let sound = InlineSound::read(&mut input).unwrap();
-    assert_eq!((sound.name, sound.fixed_range), ("a:b", None));
+    assert_eq!(sound.name, "a:b");
+    assert_eq!(sound.fixed_range, None);
 }
 
 #[test]
@@ -43,7 +45,7 @@ fn stop_sound_flags_control_optional_fields_and_frame_lengths() {
         (None, Some("a:b"), vec![2, 3, b'a', b':', b'b']),
         (Some(7), Some("a:b"), vec![3, 7, 3, b'a', b':', b'b']),
     ] {
-        let packet = StopSound { category, name };
+        let packet = StopSound { category, name: name.map(Cow::Borrowed) };
         assert_eq!(encode(&packet), expected);
         let mut input = expected.as_slice();
         assert_eq!(StopSound::decode_payload(&mut input).unwrap(), packet);
@@ -56,7 +58,7 @@ fn stop_sound_flags_control_optional_fields_and_frame_lengths() {
     }
     // Both the identifier and packet length can require multi-byte VarInts.
     let name = format!("a:{}", "b".repeat(128));
-    let packet = StopSound { category: Some(7), name: Some(&name) };
+    let packet = StopSound { category: Some(7), name: Some((&name).into()) };
     let mut frame = Vec::new();
     packet.encode(&mut frame).unwrap();
     let mut input = frame.as_slice();
@@ -118,7 +120,7 @@ fn attribute_snapshots_round_trip_with_modifiers() {
             attribute: attribute::MOVEMENT_SPEED,
             base: 0.1,
             modifiers: vec![AttributeModifier {
-                id: "minecraft:effect.speed",
+                id: "minecraft:effect.speed".into(),
                 amount: 0.4,
                 operation: attribute_operation::ADD_MULTIPLIED_TOTAL,
             }],

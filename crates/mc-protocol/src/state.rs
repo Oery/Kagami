@@ -1,3 +1,5 @@
+use mc_protocol_macros::IntoOwned;
+
 use crate::error::DecodeError;
 
 #[repr(u8)]
@@ -14,6 +16,7 @@ pub enum State {
 /// The handshake carries an intent, not a freely selectable protocol state.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(i32)]
+#[derive(IntoOwned)]
 pub enum HandshakeIntent {
     Status = 1,
     Login = 2,

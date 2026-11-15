@@ -1,9 +1,13 @@
+use std::borrow::Cow;
+
+use mc_protocol_macros::IntoOwned;
+
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 
 /// Network NBT value. Only encoding is implemented (registry data is
 /// clientbound-only in practice); decoding returns `UnexpectedEof`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IntoOwned)]
 pub enum Nbt<'p> {
     Bool(bool),
     Byte(i8),
@@ -12,9 +16,9 @@ pub enum Nbt<'p> {
     Long(i64),
     Float(f32),
     Double(f64),
-    Str(&'p str),
+    Str(Cow<'p, str>),
     List(Vec<Nbt<'p>>),
-    Compound(Vec<(&'p str, Nbt<'p>)>),
+    Compound(Vec<(Cow<'p, str>, Nbt<'p>)>),
 }
 
 impl Nbt<'_> {

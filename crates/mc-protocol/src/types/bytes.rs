@@ -1,3 +1,7 @@
+use std::borrow::Cow;
+
+use mc_protocol_macros::IntoOwned;
+
 use crate::decode::{MAX_FRAME_LEN, read_length, take};
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
@@ -22,17 +26,32 @@ impl<'p> PacketWriter<'p> for &'p [u8] {
     }
 }
 
-#[derive(Debug)]
-pub struct Remainder<'p>(pub &'p [u8]);
+impl<'p> PacketWriter<'p> for Cow<'p, [u8]> {
+    fn read(input: &mut &'p [u8]) -> Result<Self, DecodeError> {
+        Ok(Cow::Borrowed(<&[u8]>::read(input)?))
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.as_ref().encode(out)
+    }
+
+    fn body_len(&self) -> usize {
+        self.as_ref().body_len()
+    }
+}
+
+/// The rest of the payload, without a length prefix.
+#[derive(Debug, IntoOwned)]
+pub struct Remainder<'p>(pub Cow<'p, [u8]>);
 
 impl<'p> PacketWriter<'p> for Remainder<'p> {
     fn read(input: &mut &'p [u8]) -> Result<Self, DecodeError> {
         let rest = take(input, input.len())?;
-        Ok(Remainder(rest))
+        Ok(Remainder(Cow::Borrowed(rest)))
     }
 
     fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
-        out.extend_from_slice(self.0);
+        out.extend_from_slice(&self.0);
 
         Ok(())
     }

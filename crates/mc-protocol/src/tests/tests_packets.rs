@@ -18,7 +18,7 @@ fn packet_macros_preserve_qualified_generic_types_and_declared_names_and_lifetim
     let packet = QualifiedPacket {
         number: 12345,
         values: vec![VarInt(128), VarInt(-1)],
-        profile: crate::types::GameProfile { uuid: Uuid::nil(), username: "Player", properties: vec![] },
+        profile: crate::types::GameProfile { uuid: Uuid::nil(), username: "Player".into(), properties: vec![] },
     };
     let bytes = encode(&packet);
     let mut input = bytes.as_slice();
@@ -47,13 +47,13 @@ fn encode<'p, T: Payload<'p>>(v: &T) -> Vec<u8> {
 #[test]
 fn disconnects_use_json_in_login_and_network_nbt_in_config_and_play() {
     use crate::types::Nbt;
-    let config = encode(&ConfigDisconnect { reason: Nbt::Str("Server closed") });
-    let play = encode(&PlayDisconnect { reason: Nbt::Str("Server closed") });
+    let config = encode(&ConfigDisconnect { reason: Nbt::Str("Server closed".into()) });
+    let play = encode(&PlayDisconnect { reason: Nbt::Str("Server closed".into()) });
     assert_eq!(&config[..5], &[17, 0x02, 0x08, 0x00, 13]);
     assert_eq!(&play[..5], &[17, 0x20, 0x08, 0x00, 13]);
     assert_eq!(&config[5..], b"Server closed");
     assert_eq!(&play[5..], b"Server closed");
-    let login = encode(&LoginDisconnect { reason: "{\"text\":\"Server closed\"}" });
+    let login = encode(&LoginDisconnect { reason: ("{\"text\":\"Server closed\"}").into() });
     assert_eq!(login[1], 0x00);
     assert_eq!(login[2] as usize, login.len() - 3);
     assert_eq!(&login[3..], b"{\"text\":\"Server closed\"}");
@@ -90,8 +90,8 @@ fn login_success_round_trips_profile_and_session() {
 
     let profile = GameProfile {
         uuid: Uuid::nil(),
-        username: "Notch",
-        properties: vec![ProfileProperty { name: "textures", value: "abc", signature: None }],
+        username: "Notch".into(),
+        properties: vec![ProfileProperty { name: "textures".into(), value: "abc".into(), signature: None }],
     };
     let packet = LoginSuccess { profile, session_id: Uuid::nil() };
     let bytes = encode(&packet);
@@ -101,4 +101,21 @@ fn login_success_round_trips_profile_and_session() {
     let len = VarInt::read(&mut frame).unwrap().0 as usize;
     assert_eq!(len, bytes.len() - 1);
     assert_eq!(frame[0], 0x02);
+}
+
+#[test]
+fn decoded_fields_borrow_the_buffer_until_made_owned() {
+    use crate::IntoOwned;
+    use std::borrow::Cow;
+
+    let frame = encode(&ChatCommand { command: "spawn".into() });
+    let owned: ChatCommand<'static> = {
+        let buffer = frame.clone();
+        let mut payload = &buffer[2..];
+        let decoded = ChatCommand::decode_payload(&mut payload).unwrap();
+        assert!(matches!(decoded.command, Cow::Borrowed(_)));
+        decoded.into_owned()
+    };
+    assert!(matches!(owned.command, Cow::Owned(_)));
+    assert_eq!(encode(&owned), frame);
 }

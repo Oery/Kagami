@@ -30,7 +30,7 @@ fn boss_bar_operations_have_vanilla_field_order_and_lengths() {
     // Anonymous TAG_String text component, followed by progress, style and flags.
     check(
         BossBarAction::Add {
-            title: Nbt::Str("Hi"),
+            title: Nbt::Str("Hi".into()),
             progress: 0.5,
             color: BossBarColor::White,
             overlay: BossBarOverlay::Notched20,
@@ -40,7 +40,7 @@ fn boss_bar_operations_have_vanilla_field_order_and_lengths() {
     );
     check(BossBarAction::Remove, &[1]);
     check(BossBarAction::Progress(1.0), &[2, 0x3f, 0x80, 0, 0]);
-    check(BossBarAction::Title(Nbt::Str("Hi")), &[3, 8, 0, 2, b'H', b'i']);
+    check(BossBarAction::Title(Nbt::Str("Hi".into())), &[3, 8, 0, 2, b'H', b'i']);
     check(BossBarAction::Style { color: BossBarColor::Red, overlay: BossBarOverlay::Notched6 }, &[4, 2, 1]);
     for flags in 0..8 {
         check(BossBarAction::Flags(flags), &[5, flags]);

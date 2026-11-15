@@ -1,5 +1,7 @@
 //! Screens, respawn and combat packets for protocol 777.
-use mc_protocol_macros::packet;
+use std::borrow::Cow;
+
+use mc_protocol_macros::{IntoOwned, packet};
 
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
@@ -37,15 +39,15 @@ pub struct SetHeldItemResponse {
     pub slot: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct DeathLocation<'p> {
-    pub dimension: &'p str,
+    pub dimension: Cow<'p, str>,
     pub location: i64,
 }
 
 impl<'p> PacketWriter<'p> for DeathLocation<'p> {
     fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
-        Ok(Self { dimension: <&str>::read(input)?, location: i64::read(input)? })
+        Ok(Self { dimension: Cow::read(input)?, location: i64::read(input)? })
     }
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         self.dimension.encode(out)?;
@@ -60,7 +62,7 @@ impl<'p> PacketWriter<'p> for DeathLocation<'p> {
 pub struct Respawn<'p> {
     #[format = "varint"]
     pub dimension_type: i32,
-    pub dimension_name: &'p str,
+    pub dimension_name: Cow<'p, str>,
     pub hashed_seed: i64,
     #[format = "varint"]
     pub game_mode: i32,

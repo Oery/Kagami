@@ -1,14 +1,16 @@
 //! Bounded chat inputs. Signatures are consumed without claiming verification.
-use crate::encode::Result as EncodeResult;
-use mc_protocol_macros::packet;
+use std::borrow::Cow;
+
+use mc_protocol_macros::{IntoOwned, packet};
 
 use crate::decode::{read_length, take};
+use crate::encode::Result as EncodeResult;
 use crate::error::{DecodeError, EncodeError};
 use crate::packets::PacketWriter;
 use crate::types::VarInt;
 
-#[derive(Debug)]
-pub struct ChatText<'p>(pub &'p str);
+#[derive(Debug, IntoOwned)]
+pub struct ChatText<'p>(pub Cow<'p, str>);
 
 impl<'p> PacketWriter<'p> for ChatText<'p> {
     fn read(input: &mut &'p [u8]) -> Result<Self, DecodeError> {
@@ -17,7 +19,7 @@ impl<'p> PacketWriter<'p> for ChatText<'p> {
         if text.encode_utf16().count() > 256 {
             return Err(DecodeError::InvalidLength);
         }
-        Ok(Self(text))
+        Ok(Self(Cow::Borrowed(text)))
     }
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         if self.0.encode_utf16().count() > 256 {
@@ -30,18 +32,18 @@ impl<'p> PacketWriter<'p> for ChatText<'p> {
     }
 }
 
-#[derive(Debug)]
-pub struct Signature<'p>(pub &'p [u8]);
+#[derive(Debug, IntoOwned)]
+pub struct Signature<'p>(pub Cow<'p, [u8]>);
 
 impl<'p> PacketWriter<'p> for Signature<'p> {
     fn read(input: &mut &'p [u8]) -> Result<Self, DecodeError> {
-        Ok(Self(take(input, 256)?))
+        Ok(Self(Cow::Borrowed(take(input, 256)?)))
     }
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         if self.0.len() != 256 {
             return Err(EncodeError::InvalidLength);
         }
-        out.extend_from_slice(self.0);
+        out.extend_from_slice(&self.0);
         Ok(())
     }
     fn body_len(&self) -> usize {
@@ -49,7 +51,7 @@ impl<'p> PacketWriter<'p> for Signature<'p> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct LastSeen {
     pub count: i32,
     pub acknowledged: [u8; 3],
@@ -76,8 +78,8 @@ impl<'p> PacketWriter<'p> for LastSeen {
     }
 }
 
-#[derive(Debug)]
-pub struct ArgumentSignatures<'p>(pub Vec<(&'p str, Signature<'p>)>);
+#[derive(Debug, IntoOwned)]
+pub struct ArgumentSignatures<'p>(pub Vec<(Cow<'p, str>, Signature<'p>)>);
 
 impl<'p> PacketWriter<'p> for ArgumentSignatures<'p> {
     fn read(input: &mut &'p [u8]) -> Result<Self, DecodeError> {
@@ -89,7 +91,7 @@ impl<'p> PacketWriter<'p> for ArgumentSignatures<'p> {
             if name.encode_utf16().count() > 16 {
                 return Err(DecodeError::InvalidLength);
             }
-            signatures.push((name, Signature::read(input)?));
+            signatures.push((Cow::Borrowed(name), Signature::read(input)?));
         }
         Ok(Self(signatures))
     }
@@ -121,7 +123,7 @@ pub struct ChatMessage<'p> {
 
 #[packet(Play, 0x08, Serverbound)]
 pub struct SignedChatCommand<'p> {
-    pub command: &'p str,
+    pub command: Cow<'p, str>,
     pub timestamp: i64,
     pub salt: i64,
     pub signatures: ArgumentSignatures<'p>,

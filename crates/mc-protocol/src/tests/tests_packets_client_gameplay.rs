@@ -14,13 +14,13 @@ fn respawn_lengths_match_frames() {
     let mut bytes = Vec::new();
     let respawn = Respawn {
         dimension_type: 0,
-        dimension_name: "minecraft:overworld",
+        dimension_name: "minecraft:overworld".into(),
         hashed_seed: 0,
         game_mode: 0,
         previous_game_mode: 1,
         is_debug: false,
         is_flat: false,
-        death_location: Some(DeathLocation { dimension: "minecraft:overworld", location: 1 }),
+        death_location: Some(DeathLocation { dimension: "minecraft:overworld".into(), location: 1 }),
         portal_cooldown: 0,
         sea_level: 63,
         data_kept: 0,
@@ -37,7 +37,7 @@ fn respawn_lengths_match_frames() {
 #[test]
 fn screen_packets_use_protocol_777_varint_window_ids() {
     let mut bytes = Vec::new();
-    OpenScreen { window_id: 300, kind: 5, title: Nbt::Str("Games") }.encode(&mut bytes).unwrap();
+    OpenScreen { window_id: 300, kind: 5, title: Nbt::Str("Games".into()) }.encode(&mut bytes).unwrap();
     let mut input = bytes.as_slice();
     let length = VarInt::read(&mut input).unwrap().0 as usize;
     assert_eq!(input.len(), length);

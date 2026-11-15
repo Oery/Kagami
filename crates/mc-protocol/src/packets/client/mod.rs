@@ -1,7 +1,9 @@
-use crate::types::{BlockEntity, GameProfile, Heightmap, KnownPack, LightData, Nbt, RegistryEntry, TaggedRegistry, bytes::Remainder};
+use std::borrow::Cow;
 
 use mc_protocol_macros::packet;
 use uuid::Uuid;
+
+use crate::types::{BlockEntity, GameProfile, Heightmap, KnownPack, LightData, Nbt, RegistryEntry, TaggedRegistry, bytes::Remainder};
 
 mod boss_bar;
 pub use boss_bar::*;
@@ -26,7 +28,7 @@ pub use scoreboard::*;
 /// [`Status`](crate::data::motd::Status) for building one.
 #[packet(Status, 0x00, Clientbound)]
 pub struct StatusPacket<'p> {
-    pub json: &'p str,
+    pub json: Cow<'p, str>,
 }
 
 #[packet(Status, 0x01, Clientbound)]
@@ -36,14 +38,14 @@ pub struct PingResponse {
 
 #[packet(Login, 0x00, Clientbound)]
 pub struct LoginDisconnect<'p> {
-    pub reason: &'p str,
+    pub reason: Cow<'p, str>,
 }
 
 #[packet(Login, 0x01, Clientbound)]
 pub struct EncryptionRequest<'p> {
-    pub server_id: &'p str,
-    pub public_key: &'p [u8],
-    pub verify_token: &'p [u8],
+    pub server_id: Cow<'p, str>,
+    pub public_key: Cow<'p, [u8]>,
+    pub verify_token: Cow<'p, [u8]>,
     pub should_authenticate: bool,
 }
 
@@ -63,23 +65,23 @@ pub struct SetCompression {
 pub struct LoginPluginRequest<'p> {
     #[format = "varint"]
     pub message_id: i32,
-    pub channel: &'p str,
-    pub data: &'p [u8],
+    pub channel: Cow<'p, str>,
+    pub data: Cow<'p, [u8]>,
 }
 
 #[packet(Login, 0x05, Clientbound)]
 pub struct LoginCookieRequest<'p> {
-    pub key: &'p str,
+    pub key: Cow<'p, str>,
 }
 
 #[packet(Config, 0x00, Clientbound)]
 pub struct ConfigCookieRequest<'p> {
-    pub key: &'p str,
+    pub key: Cow<'p, str>,
 }
 
 #[packet(Config, 0x01, Clientbound)]
 pub struct PluginMessage<'p> {
-    pub ident: &'p str,
+    pub ident: Cow<'p, str>,
     pub data: Remainder<'p>,
 }
 
@@ -103,7 +105,7 @@ pub struct ResetChat;
 
 #[packet(Config, 0x14, Clientbound)]
 pub struct CodeOfConduct<'p> {
-    pub coc: &'p str,
+    pub coc: Cow<'p, str>,
 }
 
 // NOTE: unused by vanilla server
@@ -119,15 +121,15 @@ pub struct RemoveResourcePack {
 
 #[packet(Config, 0x0B, Clientbound)]
 pub struct StoreCookie<'p> {
-    pub key: &'p str,
-    pub payload: &'p [u8],
+    pub key: Cow<'p, str>,
+    pub payload: Cow<'p, [u8]>,
 }
 
 // TODO: enforce max sizes in parsing
 
 #[packet(Config, 0x0C, Clientbound)]
 pub struct Transfer<'p> {
-    pub host: &'p str,
+    pub host: Cow<'p, str>,
     #[format = "varint"]
     pub port: i32,
 }
@@ -185,7 +187,7 @@ pub struct PlayerAbilities {
 
 #[packet(Play, 0x63, Clientbound)]
 pub struct SetDefaultSpawnPosition<'p> {
-    pub dimension_name: &'p str,
+    pub dimension_name: Cow<'p, str>,
     pub location: i64,
     pub yaw: f32,
     pub pitch: f32,
@@ -226,7 +228,7 @@ pub struct ChunkData<'p> {
     pub chunk_x: i32,
     pub chunk_z: i32,
     pub heightmaps: Vec<Heightmap>,
-    pub data: &'p [u8],
+    pub data: Cow<'p, [u8]>,
     pub block_entities: Vec<BlockEntity<'p>>,
     pub light: LightData<'p>,
 }
@@ -269,13 +271,13 @@ pub struct KnownPacks<'p> {
 
 #[packet(Config, 0x07, Clientbound)]
 pub struct RegistryData<'p> {
-    pub registry: &'p str,
+    pub registry: Cow<'p, str>,
     pub entries: Vec<RegistryEntry<'p>>,
 }
 
 #[packet(Config, 0x0D, Clientbound)]
 pub struct FeatureFlags<'p> {
-    pub flags: Vec<&'p str>,
+    pub flags: Vec<Cow<'p, str>>,
 }
 
 #[packet(Config, 0x0E, Clientbound)]

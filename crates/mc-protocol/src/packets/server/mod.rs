@@ -1,16 +1,18 @@
+use std::borrow::Cow;
+
+use mc_protocol_macros::packet;
+use uuid::Uuid;
+
 use crate::data::config::*;
 use crate::state::HandshakeIntent;
 use crate::types::KnownPack;
 use crate::types::bytes::Remainder;
 
-use mc_protocol_macros::packet;
-use uuid::Uuid;
-
 #[packet(Handshake, 0x00, Serverbound)]
 pub struct ServerListPing<'p> {
     #[format = "varint"]
     pub version: i32,
-    pub addr: &'p str,
+    pub addr: Cow<'p, str>,
     pub port: u16,
     #[format = "varint"]
     pub next_state: HandshakeIntent,
@@ -26,21 +28,21 @@ pub struct PingRequest {
 
 #[packet(Login, 0x00, Serverbound)]
 pub struct LoginStart<'p> {
-    pub name: &'p str,
+    pub name: Cow<'p, str>,
     pub uuid: Uuid,
 }
 
 #[packet(Login, 0x01, Serverbound)]
 pub struct EncryptionResponse<'p> {
-    pub shared_secret: &'p [u8],
-    pub verify_token: &'p [u8],
+    pub shared_secret: Cow<'p, [u8]>,
+    pub verify_token: Cow<'p, [u8]>,
 }
 
 #[packet(Login, 0x02, Serverbound)]
 pub struct LoginPluginResponse<'p> {
     #[format = "varint"]
     pub message_id: i32,
-    pub data: &'p [u8],
+    pub data: Cow<'p, [u8]>,
 }
 
 #[packet(Login, 0x03, Serverbound)]
@@ -48,13 +50,13 @@ pub struct LoginAcknowledge;
 
 #[packet(Login, 0x04, Serverbound)]
 pub struct LoginCookieResponse<'p> {
-    pub ident: &'p str,
-    pub data: &'p [u8],
+    pub ident: Cow<'p, str>,
+    pub data: Cow<'p, [u8]>,
 }
 
 #[packet(Config, 0x00, Serverbound)]
 pub struct ClientInformation<'p> {
-    pub locale: &'p str,
+    pub locale: Cow<'p, str>,
     pub render_distance: u8,
     #[format = "varint"]
     pub chat_mode: ChatMode,
@@ -70,13 +72,13 @@ pub struct ClientInformation<'p> {
 
 #[packet(Config, 0x01, Serverbound)]
 pub struct ConfigCookieResponse<'p> {
-    pub key: &'p str,
-    pub payload: Option<&'p [u8]>,
+    pub key: Cow<'p, str>,
+    pub payload: Option<Cow<'p, [u8]>>,
 }
 
 #[packet(Config, 0x02, Serverbound)]
 pub struct ConfigPluginMessage<'p> {
-    pub channel: &'p str,
+    pub channel: Cow<'p, str>,
     pub data: Remainder<'p>,
 }
 
@@ -119,7 +121,7 @@ pub struct ChatAcknowledgement {
 
 #[packet(Play, 0x07, Serverbound)]
 pub struct ChatCommand<'p> {
-    pub command: &'p str,
+    pub command: Cow<'p, str>,
 }
 
 #[packet(Play, 0x0D, Serverbound)]
@@ -129,7 +131,7 @@ pub struct ClientTickEnd;
 pub struct CommandSuggestion<'p> {
     #[format = "varint"]
     pub transaction_id: i32,
-    pub text: &'p str,
+    pub text: Cow<'p, str>,
 }
 
 #[packet(Play, 0x10, Serverbound)]

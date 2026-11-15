@@ -1,5 +1,7 @@
 //! Command trees with literals, words, numeric arguments and world coordinates.
-use mc_protocol_macros::packet;
+use std::borrow::Cow;
+
+use mc_protocol_macros::{IntoOwned, packet};
 
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
@@ -7,7 +9,7 @@ use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 use crate::types::{Nbt, VarInt};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, IntoOwned)]
 pub enum CommandNumberKind {
     Integer,
     Long,
@@ -26,17 +28,17 @@ impl CommandNumberKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, IntoOwned)]
 pub enum CommandNodeKind<'p> {
     Root,
-    Literal(&'p str),
-    Word { name: &'p str, suggest: bool },
-    GreedyText { name: &'p str },
-    Number { name: &'p str, kind: CommandNumberKind },
-    Position { name: &'p str },
+    Literal(Cow<'p, str>),
+    Word { name: Cow<'p, str>, suggest: bool },
+    GreedyText { name: Cow<'p, str> },
+    Number { name: Cow<'p, str>, kind: CommandNumberKind },
+    Position { name: Cow<'p, str> },
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct CommandNode<'p> {
     pub kind: CommandNodeKind<'p>,
     pub children: Vec<VarInt>,
@@ -52,9 +54,9 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
         let children = Vec::<VarInt>::read(input)?;
         let kind = match flags & 3 {
             0 if flags & 0x10 == 0 => CommandNodeKind::Root,
-            1 if flags & 0x10 == 0 => CommandNodeKind::Literal(<&str>::read(input)?),
+            1 if flags & 0x10 == 0 => CommandNodeKind::Literal(Cow::read(input)?),
             2 => {
-                let name = <&str>::read(input)?;
+                let name = Cow::read(input)?;
                 match VarInt::read(input)?.0 {
                     5 => {
                         let mode = VarInt::read(input)?.0;
@@ -103,14 +105,14 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
         } | if self.executable { 4 } else { 0 };
         (flags as u8).encode(out)?;
         self.children.encode(out)?;
-        match self.kind {
+        match &self.kind {
             CommandNodeKind::Root => {}
             CommandNodeKind::Literal(name) => name.encode(out)?,
             CommandNodeKind::Word { name, suggest } => {
                 name.encode(out)?;
                 VarInt(5).encode(out)?;
                 VarInt(0).encode(out)?;
-                if suggest {
+                if *suggest {
                     "minecraft:ask_server".encode(out)?;
                 }
             }
@@ -135,11 +137,11 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
 
     fn body_len(&self) -> usize {
         1 + self.children.body_len()
-            + match self.kind {
+            + match &self.kind {
                 CommandNodeKind::Root => 0,
                 CommandNodeKind::Literal(name) => name.body_len(),
                 CommandNodeKind::Word { name, suggest } => {
-                    name.body_len() + 2 + if suggest { "minecraft:ask_server".body_len() } else { 0 }
+                    name.body_len() + 2 + if *suggest { "minecraft:ask_server".body_len() } else { 0 }
                 }
                 CommandNodeKind::GreedyText { name } => name.body_len() + 2,
                 CommandNodeKind::Number { name, .. } => name.body_len() + 2,
@@ -155,14 +157,14 @@ pub struct Commands<'p> {
     pub root_index: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct CommandMatch<'p> {
-    pub text: &'p str,
+    pub text: Cow<'p, str>,
 }
 
 impl<'p> PacketWriter<'p> for CommandMatch<'p> {
     fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
-        let text = <&str>::read(input)?;
+        let text = Cow::read(input)?;
         if bool::read(input)? {
             return Err(DecodeError::EnumOutOfRange);
         }

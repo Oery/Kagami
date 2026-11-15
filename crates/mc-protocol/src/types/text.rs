@@ -94,14 +94,14 @@ impl Style {
 
     pub fn nbt(&self) -> Nbt<'_> {
         let mut fields = vec![
-            ("bold", Nbt::Bool(self.bold)),
-            ("italic", Nbt::Bool(self.italic)),
-            ("underlined", Nbt::Bool(self.underlined)),
-            ("strikethrough", Nbt::Bool(self.strikethrough)),
-            ("obfuscated", Nbt::Bool(self.obfuscated)),
+            ("bold".into(), Nbt::Bool(self.bold)),
+            ("italic".into(), Nbt::Bool(self.italic)),
+            ("underlined".into(), Nbt::Bool(self.underlined)),
+            ("strikethrough".into(), Nbt::Bool(self.strikethrough)),
+            ("obfuscated".into(), Nbt::Bool(self.obfuscated)),
         ];
         if let Some(color) = self.color {
-            fields.push(("color", Nbt::Str(color)));
+            fields.push(("color".into(), Nbt::Str(color.into())));
         }
         Nbt::Compound(fields)
     }
@@ -177,7 +177,7 @@ impl Text {
         // The client requires a present `extra` list to contain at least one
         // component. Empty text is represented by the literal alone.
         if self.0.is_empty() {
-            return Nbt::Compound(vec![("text", Nbt::Str(""))]);
+            return Nbt::Compound(vec![("text".into(), Nbt::Str("".into()))]);
         }
         let extra = self
             .0
@@ -186,11 +186,11 @@ impl Text {
                 let Nbt::Compound(mut fields) = span.style.nbt() else {
                     unreachable!()
                 };
-                fields.push(("text", Nbt::Str(&span.text)));
+                fields.push(("text".into(), Nbt::Str(span.text.as_str().into())));
                 Nbt::Compound(fields)
             })
             .collect();
-        Nbt::Compound(vec![("text", Nbt::Str("")), ("extra", Nbt::List(extra))])
+        Nbt::Compound(vec![("text".into(), Nbt::Str("".into())), ("extra".into(), Nbt::List(extra))])
     }
 
     pub fn validate(&self) -> Result<(), InvalidText> {

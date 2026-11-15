@@ -1,9 +1,13 @@
+use std::borrow::Cow;
+
+use mc_protocol_macros::IntoOwned;
+
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::packets::PacketWriter;
 use crate::types::{Nbt, VarInt};
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct Heightmap {
     pub kind: u8,
     pub data: Vec<i64>,
@@ -27,7 +31,7 @@ impl<'p> PacketWriter<'p> for Heightmap {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct BlockEntity<'p> {
     pub packed_xz: u8,
     pub y: i16,
@@ -57,14 +61,14 @@ impl<'p> PacketWriter<'p> for BlockEntity<'p> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct LightData<'p> {
-    pub sky_mask: &'p [u8],
-    pub block_mask: &'p [u8],
-    pub empty_sky_mask: &'p [u8],
-    pub empty_block_mask: &'p [u8],
-    pub sky_light: Vec<&'p [u8]>,
-    pub block_light: Vec<&'p [u8]>,
+    pub sky_mask: Cow<'p, [u8]>,
+    pub block_mask: Cow<'p, [u8]>,
+    pub empty_sky_mask: Cow<'p, [u8]>,
+    pub empty_block_mask: Cow<'p, [u8]>,
+    pub sky_light: Vec<Cow<'p, [u8]>>,
+    pub block_light: Vec<Cow<'p, [u8]>>,
 }
 
 /// Sections per column on the wire: 24 world sections plus one below min
@@ -80,25 +84,28 @@ static EMPTY_MASK: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
 
 impl LightData<'_> {
     pub fn fullbright() -> LightData<'static> {
+        let full: &'static [u8] = &FULL_MASK;
+        let empty: &'static [u8] = &EMPTY_MASK;
+        let section: &'static [u8] = &FULLBRIGHT_SECTION;
         LightData {
-            sky_mask: &FULL_MASK,
-            block_mask: &FULL_MASK,
-            empty_sky_mask: &EMPTY_MASK,
-            empty_block_mask: &EMPTY_MASK,
-            sky_light: vec![&FULLBRIGHT_SECTION; LIGHT_SECTIONS],
-            block_light: vec![&FULLBRIGHT_SECTION; LIGHT_SECTIONS],
+            sky_mask: Cow::Borrowed(full),
+            block_mask: Cow::Borrowed(full),
+            empty_sky_mask: Cow::Borrowed(empty),
+            empty_block_mask: Cow::Borrowed(empty),
+            sky_light: vec![Cow::Borrowed(section); LIGHT_SECTIONS],
+            block_light: vec![Cow::Borrowed(section); LIGHT_SECTIONS],
         }
     }
 }
 
 impl<'p> PacketWriter<'p> for LightData<'p> {
     fn read(buf: &mut &'p [u8]) -> DecodeResult<Self> {
-        let sky_mask = <&[u8]>::read(buf)?;
-        let block_mask = <&[u8]>::read(buf)?;
-        let empty_sky_mask = <&[u8]>::read(buf)?;
-        let empty_block_mask = <&[u8]>::read(buf)?;
-        let sky_light = <Vec<&[u8]>>::read(buf)?;
-        let block_light = <Vec<&[u8]>>::read(buf)?;
+        let sky_mask = Cow::read(buf)?;
+        let block_mask = Cow::read(buf)?;
+        let empty_sky_mask = Cow::read(buf)?;
+        let empty_block_mask = Cow::read(buf)?;
+        let sky_light = Vec::read(buf)?;
+        let block_light = Vec::read(buf)?;
         Ok(Self { sky_mask, block_mask, empty_sky_mask, empty_block_mask, sky_light, block_light })
     }
 

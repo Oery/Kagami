@@ -1,5 +1,5 @@
 //! Protocol 777 boss events (Minecraft Wiki, cross-checked with the 26.3 client).
-use mc_protocol_macros::packet;
+use mc_protocol_macros::{IntoOwned, packet};
 use uuid::Uuid;
 
 use crate::decode::Result as DecodeResult;
@@ -10,7 +10,7 @@ use crate::types::{Nbt, VarInt};
 
 macro_rules! ordinal {
     ($name:ident { $($variant:ident = $value:literal),* $(,)? }) => {
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, IntoOwned)]
         pub enum $name { $($variant = $value),* }
         impl PacketWriter<'_> for $name {
             fn read(input: &mut &[u8]) -> DecodeResult<Self> {
@@ -29,7 +29,7 @@ macro_rules! ordinal {
 ordinal!(BossBarColor { Pink = 0, Blue = 1, Red = 2, Green = 3, Yellow = 4, Purple = 5, White = 6 });
 ordinal!(BossBarOverlay { Continuous = 0, Notched6 = 1, Notched10 = 2, Notched12 = 3, Notched20 = 4 });
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub enum BossBarAction<'p> {
     Add { title: Nbt<'p>, progress: f32, color: BossBarColor, overlay: BossBarOverlay, flags: u8 },
     Remove,

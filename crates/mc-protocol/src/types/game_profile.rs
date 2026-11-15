@@ -1,26 +1,29 @@
+use std::borrow::Cow;
+
+use mc_protocol_macros::IntoOwned;
 use uuid::Uuid;
 
 use crate::PacketWriter;
 use crate::error::DecodeError;
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct ProfileProperty<'p> {
-    pub name: &'p str,
-    pub value: &'p str,
-    pub signature: Option<&'p str>,
+    pub name: Cow<'p, str>,
+    pub value: Cow<'p, str>,
+    pub signature: Option<Cow<'p, str>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, IntoOwned)]
 pub struct GameProfile<'p> {
     pub uuid: Uuid,
-    pub username: &'p str,
+    pub username: Cow<'p, str>,
     pub properties: Vec<ProfileProperty<'p>>,
 }
 
 impl<'p> PacketWriter<'p> for GameProfile<'p> {
     fn read(buf: &mut &'p [u8]) -> Result<Self, DecodeError> {
         let uuid = Uuid::read(buf)?;
-        let username: &str = <&str>::read(buf)?;
+        let username = Cow::read(buf)?;
         let properties = <Vec<ProfileProperty>>::read(buf)?;
 
         Ok(GameProfile { uuid, username, properties })
@@ -41,9 +44,9 @@ impl<'p> PacketWriter<'p> for GameProfile<'p> {
 
 impl<'p> PacketWriter<'p> for ProfileProperty<'p> {
     fn read(buf: &mut &'p [u8]) -> Result<Self, DecodeError> {
-        let name: &str = <&str>::read(buf)?;
-        let value: &str = <&str>::read(buf)?;
-        let signature: Option<&str> = <Option<&str>>::read(buf)?;
+        let name = Cow::read(buf)?;
+        let value = Cow::read(buf)?;
+        let signature = Option::read(buf)?;
 
         Ok(ProfileProperty { name, value, signature })
     }

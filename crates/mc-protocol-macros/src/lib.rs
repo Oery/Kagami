@@ -5,9 +5,11 @@ use syn::{Data, DeriveInput, Fields, Generics, Lifetime, Type, parse_macro_input
 
 mod attrs;
 mod format;
+mod owned;
 
 use attrs::PacketAttributes;
 use format::Format;
+use owned::expand_into_owned;
 
 enum Direction {
     Serverbound,
@@ -118,6 +120,7 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
         quote!(Self { #(#names),* })
     };
     let item = without_format_attributes(item);
+    let into_owned = expand_into_owned(&item)?;
 
     Ok(quote! {
         #[derive(Debug)]
@@ -142,6 +145,8 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
                 Ok(())
             }
         }
+
+        #into_owned
     })
 }
 
@@ -155,6 +160,12 @@ fn without_format_attributes(item: &DeriveInput) -> DeriveInput {
         field.attrs.retain(|attr| !attr.path().is_ident("format"));
     }
     item
+}
+
+#[proc_macro_derive(IntoOwned)]
+pub fn derive_into_owned(input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as DeriveInput);
+    expand_into_owned(&item).unwrap_or_else(syn::Error::into_compile_error).into()
 }
 
 #[proc_macro_derive(InnerPacket)]
