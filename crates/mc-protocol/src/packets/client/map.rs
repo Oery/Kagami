@@ -274,3 +274,7 @@ pub struct Waypoint<'p> {
     pub color: Option<Rgb>,
     pub target: WaypointTarget,
 }
+
+#[cfg(test)]
+#[path = "../../../tests/tests_packets_client_map.rs"]
+mod tests;

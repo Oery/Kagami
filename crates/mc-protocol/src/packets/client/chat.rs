@@ -176,3 +176,7 @@ pub struct ChatSuggestions<'p> {
     pub action: i32,
     pub entries: Vec<Cow<'p, str>>,
 }
+
+#[cfg(test)]
+#[path = "../../../tests/tests_packets_client_chat.rs"]
+mod tests;

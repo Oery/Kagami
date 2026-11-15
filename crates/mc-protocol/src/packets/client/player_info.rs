@@ -226,3 +226,7 @@ impl<'p> Payload<'p> for PlayerInfoUpdate<'p> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/tests_packets_player_info.rs"]
+mod tests;
