@@ -28,17 +28,18 @@ pub fn split_data_length(body: &[u8]) -> io::Result<(usize, &[u8])> {
     Ok((data_len, data))
 }
 
-/// Prefixes the body of an uncompressed frame with a zero data length, which
-/// sends the packet uncompressed in the compressed framing.
-pub fn add_zero_data_length(frame: &mut Vec<u8>) -> io::Result<()> {
-    let mut body = frame.as_slice();
+/// Prefixes the body of the uncompressed frame starting at `start` with a
+/// zero data length, which sends the packet uncompressed in the compressed
+/// framing.
+pub fn add_zero_data_length(frames: &mut Vec<u8>, start: usize) -> io::Result<()> {
+    let mut body = &frames[start..];
     let body_len = VarInt::read(&mut body).map_err(invalid_data)?.0;
-    let header_len = frame.len() - body.len();
+    let header_end = frames.len() - body.len();
 
     let mut header = Vec::with_capacity(4);
     VarInt(body_len + 1).encode(&mut header).map_err(invalid_data)?;
     header.push(0);
-    frame.splice(..header_len, header);
+    frames.splice(start..header_end, header);
 
     Ok(())
 }

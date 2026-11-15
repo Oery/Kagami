@@ -6,6 +6,7 @@
 //! so frames pass through both legs unchanged.
 
 use std::io;
+use std::rc::Rc;
 
 use futures_lite::future::zip;
 use glommio::net::TcpStream;
@@ -18,14 +19,16 @@ use mc_protocol::{Direction, IntoOwned, Payload, State};
 use crate::Config;
 use crate::connection::Connection;
 use crate::frame::FrameBuffer;
+use crate::handlers::Handlers;
 use crate::invalid_data;
 use crate::online::answer_encryption;
-use crate::pump::{Wire, pump};
-use crate::split::{ReadHalf, WriteHalf};
-use crate::stream::{Reader, Writer};
+use crate::outlet::{Client, Outlet, Server};
+use crate::pump::{Pump, Shared};
+use crate::split::ReadHalf;
+use crate::stream::Reader;
 
 /// Serves one client connection until either side closes it.
-pub async fn serve(client: TcpStream, config: &Config) -> io::Result<()> {
+pub async fn serve<S, H: Handlers<S>>(client: TcpStream, config: &Config, shared: &Rc<Shared<S, H>>) -> io::Result<()> {
     let mut client = Connection::new(client)?;
 
     let Some(Serverbound::ServerListPing(handshake)) = client.read_serverbound(State::Handshake).await? else {
@@ -49,7 +52,7 @@ pub async fn serve(client: TcpStream, config: &Config) -> io::Result<()> {
                 return Ok(());
             }
 
-            pump_both(client, server).await
+            pump_both(client, server, shared).await
         }
     }
 }
@@ -161,17 +164,31 @@ async fn forward_clientbound(server: &mut Connection, client: &mut Connection, s
 }
 
 /// Pumps both directions, starting in configuration, until both have ended.
-async fn pump_both(client: Connection, server: Connection) -> io::Result<()> {
+async fn pump_both<S, H: Handlers<S>>(client: Connection, server: Connection, shared: &Rc<Shared<S, H>>) -> io::Result<()> {
     let client = client.into_parts();
     let server = server.into_parts();
     debug_assert_eq!(client.compressed, server.compressed, "compression is mirrored");
 
-    let to_server = Wire { direction: Direction::Serverbound, compressed: client.compressed };
-    let to_client = Wire { direction: Direction::Clientbound, compressed: server.compressed };
+    let compressed = server.compressed;
+    let client_outlet = Client(Rc::new(Outlet::new(client.writer, compressed)));
+    let server_outlet = Server(Rc::new(Outlet::new(server.writer, compressed)));
 
-    let to_server = pump_until_closed(to_server, client.buffer, client.reader, server.writer);
-    let to_client = pump_until_closed(to_client, server.buffer, server.reader, client.writer);
-    let (to_server, to_client) = zip(to_server, to_client).await;
+    let mut to_server = Pump::new(Direction::Serverbound, compressed, shared.clone(), client_outlet.clone(), server_outlet.clone());
+    let mut to_client = Pump::new(Direction::Clientbound, compressed, shared.clone(), client_outlet.clone(), server_outlet.clone());
+
+    let pumps = async {
+        let to_server = pump_until_closed(&mut to_server, client.buffer, client.reader);
+        let to_client = pump_until_closed(&mut to_client, server.buffer, server.reader);
+        let pumped = zip(to_server, to_client).await;
+
+        client_outlet.0.close();
+        server_outlet.0.close();
+
+        pumped
+    };
+    // A flusher fails only when its socket is gone, which the pumps report.
+    let flushers = zip(client_outlet.0.flush_when_woken(), server_outlet.0.flush_when_woken());
+    let ((to_server, to_client), _) = zip(pumps, flushers).await;
 
     to_server.and(to_client)
 }
@@ -179,13 +196,13 @@ async fn pump_both(client: Connection, server: Connection) -> io::Result<()> {
 /// When one direction ends, it closes the socket it was writing to. That
 /// ends the other direction's read on the same socket, so no read is ever
 /// cancelled mid-flight.
-async fn pump_until_closed(
-    wire: Wire, mut buffer: FrameBuffer, mut reader: Reader<ReadHalf>, mut writer: Writer<WriteHalf>,
+async fn pump_until_closed<S, H: Handlers<S>>(
+    pump: &mut Pump<S, H>, mut buffer: FrameBuffer, mut reader: Reader<ReadHalf>,
 ) -> io::Result<()> {
-    let pumped = pump(wire, State::Config, &mut buffer, &mut reader, &mut writer).await;
+    let pumped = pump.run(&mut buffer, &mut reader).await;
 
     // The peer may already be gone; the pump's own result is what matters.
-    let _ = writer.shutdown().await;
+    let _ = pump.target().shutdown().await;
 
     pumped
 }

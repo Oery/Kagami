@@ -71,3 +71,7 @@ impl Writer<WriteHalf> {
         self.inner.shutdown().await
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/tests_stream.rs"]
+mod tests;

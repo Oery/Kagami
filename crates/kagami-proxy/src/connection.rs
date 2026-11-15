@@ -96,7 +96,7 @@ impl Connection {
         encode(&mut self.outgoing).map_err(invalid_data)?;
 
         if self.compression.is_some() {
-            add_zero_data_length(&mut self.outgoing)?;
+            add_zero_data_length(&mut self.outgoing, 0)?;
         }
 
         self.writer.write_all_in_place(&mut self.outgoing).await

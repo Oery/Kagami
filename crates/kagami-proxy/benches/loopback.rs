@@ -506,7 +506,7 @@ fn start_proxy(server: SocketAddr, wire: Wire) -> SocketAddr {
     let account = wire.encryption.then(|| Account { access_token: String::new(), uuid: Uuid::nil(), name: "bench".to_owned() });
     let upstream = Upstream { host: server.ip().to_string(), port: server.port() };
 
-    thread::spawn(move || kagami_proxy::run(Config { listen, upstream, account }).unwrap());
+    thread::spawn(move || kagami_proxy::run(Config { listen, upstream, account }, (), ()).unwrap());
 
     listen
 }

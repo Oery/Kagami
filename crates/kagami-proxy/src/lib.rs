@@ -10,13 +10,16 @@ mod cipher;
 mod compression;
 mod connection;
 mod frame;
+mod handlers;
 mod online;
+mod outlet;
 mod pump;
 mod session;
 mod split;
 mod stream;
 mod transition;
 
+use std::cell::RefCell;
 use std::error::Error;
 use std::io;
 use std::net::SocketAddr;
@@ -25,8 +28,12 @@ use std::rc::Rc;
 use glommio::LocalExecutorBuilder;
 use glommio::net::TcpListener;
 
+use crate::pump::Shared;
+use crate::session::serve;
+
+pub use handlers::{Action, Context, Handlers, Interest};
 pub use online::Account;
-pub use session::serve;
+pub use outlet::{Client, Server};
 
 const DEFAULT_PORT: u16 = 25565;
 
@@ -64,28 +71,58 @@ pub struct Config {
     pub account: Option<Account>,
 }
 
-/// Proxies every client that connects to `config.listen`, forever. Starts
-/// its own single-threaded executor and blocks the calling thread.
-pub fn run(config: Config) -> io::Result<()> {
+/// Proxies every client that connects to `config.listen`, forever, running
+/// `handlers` on the packets they want. Starts its own single-threaded
+/// executor and blocks the calling thread.
+pub fn run<S: 'static, H: Handlers<S> + 'static>(config: Config, state: S, handlers: H) -> io::Result<()> {
+    let shared = Rc::new(Shared { state: RefCell::new(state), handlers: RefCell::new(handlers) });
     let executor = LocalExecutorBuilder::default().name("kagami").make()?;
 
-    executor.run(accept_forever(Rc::new(config)))
+    executor.run(accept_forever(Rc::new(config), shared))
 }
 
-async fn accept_forever(config: Rc<Config>) -> io::Result<()> {
+async fn accept_forever<S: 'static, H: Handlers<S> + 'static>(config: Rc<Config>, shared: Rc<Shared<S, H>>) -> io::Result<()> {
     let listener = TcpListener::bind(config.listen)?;
 
     loop {
         let client = listener.accept().await?;
         let config = config.clone();
+        let shared = shared.clone();
 
         // Server list pings open their own short connections next to a game session.
         glommio::spawn_local(async move {
-            if let Err(error) = serve(client, &config).await {
+            if let Err(error) = serve(client, &config, &shared).await {
                 eprintln!("kagami: session ended: {error}");
             }
         })
         .detach();
+    }
+}
+
+/// Builds handlers' context outside a session, for tests of handler chains.
+#[doc(hidden)]
+pub mod testing {
+    use std::rc::Rc;
+
+    use glommio::net::{TcpListener, TcpStream};
+
+    use crate::outlet::{Client, Outlet, Server};
+    use crate::split::split;
+    use crate::stream::Writer;
+
+    /// Handles writing to loopback sockets nobody reads. Call it inside a
+    /// Glommio executor.
+    pub async fn handles() -> (Client, Server) {
+        (Client(outlet().await), Server(outlet().await))
+    }
+
+    async fn outlet() -> Rc<Outlet> {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a loopback port is free");
+        let address = listener.local_addr().expect("a bound listener has an address");
+        let stream = TcpStream::connect(address).await.expect("the listener accepts");
+        let (_, writer) = split(stream);
+
+        Rc::new(Outlet::new(Writer::new(writer), false))
     }
 }
 

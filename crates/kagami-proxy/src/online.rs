@@ -1,6 +1,7 @@
 //! Online-mode login: the proxy joins the session as the player's account
 //! and answers the server's encryption request.
 
+use std::env;
 use std::io;
 use std::time::Duration;
 
@@ -24,6 +25,27 @@ pub struct Account {
     pub access_token: String,
     pub uuid: Uuid,
     pub name: String,
+}
+
+impl Account {
+    /// The account from `KAGAMI_ACCESS_TOKEN`, `KAGAMI_UUID` and
+    /// `KAGAMI_NAME`, or `None` when no token is set. Launchers show these
+    /// for the account they start the game with.
+    pub fn from_env() -> io::Result<Option<Account>> {
+        let Ok(access_token) = env::var("KAGAMI_ACCESS_TOKEN") else {
+            return Ok(None);
+        };
+
+        let uuid = env::var("KAGAMI_UUID").map_err(|_| invalid_input("KAGAMI_UUID is not set"))?;
+        let uuid = uuid.parse().map_err(|_| invalid_input("KAGAMI_UUID is not a UUID"))?;
+        let name = env::var("KAGAMI_NAME").map_err(|_| invalid_input("KAGAMI_NAME is not set"))?;
+
+        Ok(Some(Account { access_token, uuid, name }))
+    }
+}
+
+fn invalid_input(message: &str) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, message.to_owned())
 }
 
 /// Joins the session when the server asks for it, sends the shared secret

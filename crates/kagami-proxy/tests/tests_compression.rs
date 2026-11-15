@@ -47,7 +47,12 @@ fn packets_are_borrowed_when_uncompressed_and_inflated_otherwise() {
 
 #[test]
 fn proxy_packets_are_framed_uncompressed() {
-    let mut frame = vec![2, 0x2e, 9];
-    add_zero_data_length(&mut frame).unwrap();
-    assert_eq!(frame, [3, 0, 0x2e, 9]);
+    let mut frames = vec![2, 0x2e, 9];
+    add_zero_data_length(&mut frames, 0).unwrap();
+    assert_eq!(frames, [3, 0, 0x2e, 9]);
+
+    // A frame appended after others.
+    frames.extend_from_slice(&[1, 0x03]);
+    add_zero_data_length(&mut frames, 4).unwrap();
+    assert_eq!(frames, [3, 0, 0x2e, 9, 2, 0, 0x03]);
 }
