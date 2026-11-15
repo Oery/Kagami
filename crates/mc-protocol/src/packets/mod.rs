@@ -17,6 +17,8 @@ pub mod server;
 mod serverbound;
 
 pub use clientbound::Clientbound;
+/// Derives the [`PacketWriter`](trait@PacketWriter) codec of a struct from its fields.
+pub use mc_protocol_macros::PacketWriter;
 pub use serverbound::Serverbound;
 
 /// A field codec. Decoding borrows from the input; encoding appends to `out`.

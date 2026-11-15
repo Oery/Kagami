@@ -1,15 +1,16 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as Tokens;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, Generics, Lifetime, Type, parse_macro_input};
+use syn::{Data, DeriveInput, Generics, Lifetime, parse_macro_input};
 
 mod attrs;
+mod fields;
 mod format;
 mod owned;
 mod packet_enum;
 
 use attrs::PacketAttributes;
-use format::Format;
+use fields::{FieldCodecs, field_codecs};
 use owned::expand_into_owned;
 use packet_enum::expand_packet_enum;
 
@@ -26,13 +27,13 @@ enum State {
     Play,
 }
 
-/// Owned packets still implement Payload for any input lifetime. Borrowed
-/// packets use their declared lifetime, without assuming it is named `'p`.
-fn codec_generics(generics: &Generics) -> syn::Result<(Generics, Lifetime)> {
+/// Owned types still implement their codec for any input lifetime. Borrowed
+/// types use their declared lifetime, without assuming it is named `'p`.
+fn codec_generics(generics: &Generics, what: &str) -> syn::Result<(Generics, Lifetime)> {
     if generics.params.iter().any(|param| !matches!(param, syn::GenericParam::Lifetime(_))) || generics.lifetimes().count() > 1 {
         return Err(syn::Error::new_spanned(
             generics,
-            "packets support at most one lifetime and no type or const parameters",
+            format!("{what} support at most one lifetime and no type or const parameters"),
         ));
     }
 
@@ -61,15 +62,10 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
     let Data::Struct(data) = &item.data else {
         return Err(syn::Error::new_spanned(item, "packets must be structs"));
     };
-    let fields: Vec<_> = match &data.fields {
-        Fields::Named(fields) => fields.named.iter().collect(),
-        Fields::Unit => Vec::new(),
-        Fields::Unnamed(_) => {
-            return Err(syn::Error::new_spanned(&data.fields, "packets require named fields"));
-        }
-    };
+    let FieldCodecs { decodes, encodes, lengths, construct } = field_codecs(data, "packets")?;
+
     let name = &item.ident;
-    let (implementation, lifetime) = codec_generics(&item.generics)?;
+    let (implementation, lifetime) = codec_generics(&item.generics, "packets")?;
     let (impl_generics, _, where_clause) = implementation.split_for_impl();
     let (_, ty_generics, _) = item.generics.split_for_impl();
     let state = match state {
@@ -85,33 +81,6 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
     };
     let id = i32::from(id);
 
-    let mut decodes = Vec::new();
-    let mut encodes = Vec::new();
-    let mut lengths = Vec::new();
-
-    for field in &fields {
-        let ident = &field.ident;
-        let ty = &field.ty;
-        let (decode, encode, length) = match Format::parse(&field.attrs)? {
-            Format::Standard => (
-                quote!(let #ident = <#ty as ::mc_protocol::PacketWriter>::read(buf)?;),
-                quote!(::mc_protocol::PacketWriter::encode(&self.#ident, out)?;),
-                quote!(::mc_protocol::PacketWriter::body_len(&self.#ident)),
-            ),
-            Format::VarInt => variable_length(ident, ty, quote!(::mc_protocol::VarInt), quote!(i32)),
-            Format::VarLong => variable_length(ident, ty, quote!(::mc_protocol::types::VarLong), quote!(i64)),
-        };
-        decodes.push(decode);
-        encodes.push(encode);
-        lengths.push(length);
-    }
-
-    let names = fields.iter().map(|field| &field.ident);
-    let construct = if matches!(data.fields, Fields::Unit) {
-        quote!(Self)
-    } else {
-        quote!(Self { #(#names),* })
-    };
     let item = without_format_attributes(item);
     let into_owned = expand_into_owned(&item)?;
 
@@ -143,27 +112,6 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
     })
 }
 
-/// The codec of a field sent as a VarInt or VarLong: `wrapper` is the
-/// codec type and `wire` the integer it holds.
-fn variable_length(ident: &Option<syn::Ident>, ty: &Type, wrapper: Tokens, wire: Tokens) -> (Tokens, Tokens, Tokens) {
-    // A field of the wire type needs no fallible conversion; other integer
-    // fields keep their checked conversion from the signed wire value.
-    let read = quote!(<#wrapper as ::mc_protocol::PacketWriter>::read(buf)?.0);
-    let wire_name = wire.to_string();
-    let is_wire_type = match ty {
-        Type::Path(path) => path.path.segments.last().is_some_and(|segment| segment.ident == wire_name),
-        _ => false,
-    };
-    let value = if is_wire_type { read } else { quote!(#read.try_into()?) };
-
-    let encoded = quote!(#wrapper(self.#ident as #wire));
-    let decode = quote!(let #ident: #ty = #value;);
-    let encode = quote!(::mc_protocol::PacketWriter::encode(&#encoded, out)?;);
-    let length = quote!(::mc_protocol::PacketWriter::body_len(&#encoded));
-
-    (decode, encode, length)
-}
-
 /// `#[format]` only steers the generated codec; the struct itself must not keep it.
 fn without_format_attributes(item: &DeriveInput) -> DeriveInput {
     let mut item = item.clone();
@@ -176,6 +124,45 @@ fn without_format_attributes(item: &DeriveInput) -> DeriveInput {
     }
 
     item
+}
+
+/// Implements `PacketWriter` for a struct by coding its named fields in
+/// declaration order. Fields accept `#[format = "varint"]` and
+/// `#[format = "varlong"]`, as in `#[packet]`.
+#[proc_macro_derive(PacketWriter, attributes(format))]
+pub fn derive_packet_writer(input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as DeriveInput);
+    expand_packet_writer(&item).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+fn expand_packet_writer(item: &DeriveInput) -> syn::Result<Tokens> {
+    let Data::Struct(data) = &item.data else {
+        return Err(syn::Error::new_spanned(item, "PacketWriter can only be derived for structs"));
+    };
+    let FieldCodecs { decodes, encodes, lengths, construct } = field_codecs(data, "field codecs")?;
+
+    let name = &item.ident;
+    let (implementation, lifetime) = codec_generics(&item.generics, "field codecs")?;
+    let (impl_generics, _, where_clause) = implementation.split_for_impl();
+    let (_, ty_generics, _) = item.generics.split_for_impl();
+
+    Ok(quote! {
+        impl #impl_generics ::mc_protocol::PacketWriter<#lifetime> for #name #ty_generics #where_clause {
+            fn read(buf: &mut &#lifetime [u8]) -> ::mc_protocol::decode::Result<Self> {
+                #(#decodes)*
+                Ok(#construct)
+            }
+
+            fn encode(&self, out: &mut Vec<u8>) -> ::mc_protocol::encode::Result {
+                #(#encodes)*
+                Ok(())
+            }
+
+            fn body_len(&self) -> usize {
+                0 #(+ #lengths)*
+            }
+        }
+    })
 }
 
 #[proc_macro_derive(IntoOwned)]
