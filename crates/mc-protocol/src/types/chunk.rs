@@ -65,12 +65,14 @@ impl<'p> PacketWriter<'p> for BlockEntity<'p> {
     }
 }
 
+/// The masks are BitSets: bit `i` of the whole set is bit `i % 64` of
+/// `mask[i / 64]`, one bit per section.
 #[derive(Debug, IntoOwned)]
 pub struct LightData<'p> {
-    pub sky_mask: Cow<'p, [u8]>,
-    pub block_mask: Cow<'p, [u8]>,
-    pub empty_sky_mask: Cow<'p, [u8]>,
-    pub empty_block_mask: Cow<'p, [u8]>,
+    pub sky_mask: Vec<i64>,
+    pub block_mask: Vec<i64>,
+    pub empty_sky_mask: Vec<i64>,
+    pub empty_block_mask: Vec<i64>,
     pub sky_light: Vec<Cow<'p, [u8]>>,
     pub block_light: Vec<Cow<'p, [u8]>>,
 }
@@ -82,21 +84,18 @@ pub const LIGHT_SECTIONS: usize = 26;
 /// Shared by every chunk of every connection; never allocated per send.
 static FULLBRIGHT_SECTION: [u8; 2048] = [0xFF; 2048];
 /// 26 bits set: every section carries explicit light data.
-static FULL_MASK: [u8; 4] = [0xFF, 0xFF, 0xFF, 0x03];
-/// No section is all-zero.
-static EMPTY_MASK: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
+const FULL_MASK: i64 = (1 << LIGHT_SECTIONS) - 1;
 
 impl LightData<'_> {
     pub fn fullbright() -> LightData<'static> {
-        let full: &'static [u8] = &FULL_MASK;
-        let empty: &'static [u8] = &EMPTY_MASK;
         let section: &'static [u8] = &FULLBRIGHT_SECTION;
 
+        // An empty BitSet has no longs at all: no section is all-zero.
         LightData {
-            sky_mask: Cow::Borrowed(full),
-            block_mask: Cow::Borrowed(full),
-            empty_sky_mask: Cow::Borrowed(empty),
-            empty_block_mask: Cow::Borrowed(empty),
+            sky_mask: vec![FULL_MASK],
+            block_mask: vec![FULL_MASK],
+            empty_sky_mask: Vec::new(),
+            empty_block_mask: Vec::new(),
             sky_light: vec![Cow::Borrowed(section); LIGHT_SECTIONS],
             block_light: vec![Cow::Borrowed(section); LIGHT_SECTIONS],
         }
@@ -105,10 +104,10 @@ impl LightData<'_> {
 
 impl<'p> PacketWriter<'p> for LightData<'p> {
     fn read(buf: &mut &'p [u8]) -> DecodeResult<Self> {
-        let sky_mask = Cow::read(buf)?;
-        let block_mask = Cow::read(buf)?;
-        let empty_sky_mask = Cow::read(buf)?;
-        let empty_block_mask = Cow::read(buf)?;
+        let sky_mask = Vec::read(buf)?;
+        let block_mask = Vec::read(buf)?;
+        let empty_sky_mask = Vec::read(buf)?;
+        let empty_block_mask = Vec::read(buf)?;
         let sky_light = Vec::read(buf)?;
         let block_light = Vec::read(buf)?;
 
