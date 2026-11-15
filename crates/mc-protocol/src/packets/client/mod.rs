@@ -5,6 +5,8 @@ use uuid::Uuid;
 
 use crate::types::{BlockEntity, GameProfile, Heightmap, KnownPack, LightData, Nbt, RegistryEntry, TaggedRegistry, bytes::Remainder};
 
+mod advancements;
+pub use advancements::*;
 mod boss_bar;
 pub use boss_bar::*;
 mod chat;
@@ -17,12 +19,16 @@ mod gameplay;
 pub use gameplay::*;
 mod inventory;
 pub use inventory::*;
+mod map;
+pub use map::*;
 mod player;
 pub use player::*;
 mod player_info;
 pub use player_info::*;
 mod commands;
 pub use commands::*;
+mod debug;
+pub use debug::*;
 mod common;
 pub use common::*;
 mod team;
@@ -31,6 +37,8 @@ mod blocks;
 pub use blocks::*;
 mod scoreboard;
 pub use scoreboard::*;
+mod world;
+pub use world::*;
 
 /// The raw JSON is kept so unknown fields survive; see
 /// [`Status`](crate::data::motd::Status) for building one.
