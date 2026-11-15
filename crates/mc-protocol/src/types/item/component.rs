@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use super::ItemStackTemplate;
 use super::components::*;
-use crate::decode::Result as DecodeResult;
+use crate::decode::{Nesting, Result as DecodeResult};
 use crate::encode::Result as EncodeResult;
 use crate::packets::PacketWriter;
 use crate::types::entity_metadata::PaintingVariant;
@@ -147,6 +147,9 @@ tagged_enum! {
 /// A component with its ID first, as in exact item predicates.
 impl<'p> PacketWriter<'p> for Component<'p> {
     fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
+        // A block predicate holds components, which may hold block predicates.
+        let _nesting = Nesting::enter()?;
+
         let id = VarInt::read(input)?.0;
 
         Self::read_value(id, input)

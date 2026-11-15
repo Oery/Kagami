@@ -11,7 +11,7 @@ use mc_protocol_macros::IntoOwned;
 pub use component::{Component, component_type};
 pub use components::*;
 
-use crate::decode::{MAX_COLLECTION_LEN, Result as DecodeResult, read_length, take};
+use crate::decode::{MAX_COLLECTION_LEN, Nesting, Result as DecodeResult, read_length, take};
 use crate::encode::Result as EncodeResult;
 use crate::error::{DecodeError, EncodeError};
 use crate::packets::PacketWriter;
@@ -156,10 +156,14 @@ pub struct ComponentPatch<'p> {
 
 impl<'p> ComponentPatch<'p> {
     fn read_framed(input: &mut &'p [u8], framing: Framing) -> DecodeResult<Self> {
+        // Components hold stacks of their own, such as a bundle's contents.
+        let _nesting = Nesting::enter()?;
+
         let added_count = read_length(input, MAX_COLLECTION_LEN)?;
         let removed_count = read_length(input, MAX_COLLECTION_LEN)?;
 
         let mut added = Vec::new();
+
         for _ in 0..added_count {
             let id = VarInt::read(input)?.0;
             let component = match framing {
@@ -171,6 +175,7 @@ impl<'p> ComponentPatch<'p> {
         }
 
         let mut removed = Vec::new();
+
         for _ in 0..removed_count {
             removed.push(VarInt::read(input)?);
         }
@@ -200,7 +205,8 @@ impl<'p> ComponentPatch<'p> {
     }
 
     fn framed_len(&self, framing: Framing) -> usize {
-        let mut length = VarInt(self.added.len() as i32).body_len() + VarInt(self.removed.len() as i32).body_len();
+        let mut length = VarInt(self.added.len() as i32).body_len();
+        length += VarInt(self.removed.len() as i32).body_len();
 
         for component in &self.added {
             let value_len = component.value_len();

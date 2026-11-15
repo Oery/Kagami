@@ -44,6 +44,9 @@ pub enum DecodeError {
     #[error("enum variant is out of range")]
     EnumOutOfRange,
 
+    #[error("values nest too deeply")]
+    NestedTooDeeply,
+
     #[error("json is not valid")]
     InvalidJSON(#[from] serde_json::Error),
 

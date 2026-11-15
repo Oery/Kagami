@@ -26,12 +26,13 @@ impl<'p> PacketWriter<'p> for HolderSet<'p> {
             return Ok(Self::Tag(Cow::read(input)?));
         }
 
-        let count = usize::try_from(header - 1).map_err(|_| DecodeError::InvalidLength)?;
+        let count = usize::try_from(header).map_err(|_| DecodeError::InvalidLength)? - 1;
         if count > MAX_COLLECTION_LEN {
             return Err(DecodeError::InvalidLength);
         }
 
         let mut ids = Vec::new();
+
         for _ in 0..count {
             ids.push(VarInt::read(input)?);
         }

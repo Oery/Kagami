@@ -110,3 +110,29 @@ fn an_unknown_component_type_does_not_decode() {
 
     assert!(matches!(Slot::read(&mut bytes.as_slice()), Err(DecodeError::EnumOutOfRange)));
 }
+
+/// A slot holding a bundle `depth` bundles deep.
+fn nested_bundles(depth: usize) -> Vec<u8> {
+    let mut bytes = vec![1, 10, 1, 0];
+
+    for _ in 0..depth {
+        // Bundle contents of one stack, holding one added component.
+        bytes.extend([52, 1, 10, 1, 1, 0]);
+    }
+
+    // The innermost bundle is empty.
+    bytes.extend([52, 0]);
+
+    bytes
+}
+
+#[test]
+fn deeply_nested_stacks_fail_instead_of_overflowing_the_stack() {
+    let too_deep = nested_bundles(100);
+
+    let result = Slot::read(&mut too_deep.as_slice());
+    assert!(matches!(result, Err(DecodeError::NestedTooDeeply)));
+
+    let shallow = nested_bundles(3);
+    assert!(Slot::read(&mut shallow.as_slice()).is_ok());
+}

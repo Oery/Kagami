@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::decode::{MAX_COLLECTION_LEN, read_length, take};
+use crate::decode::{MAX_COLLECTION_LEN, Nesting, read_length, take};
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 use crate::types::VarInt;
@@ -138,6 +138,8 @@ impl<'p, T: PacketWriter<'p>, const N: usize> PacketWriter<'p> for [T; N] {
 /// A boxed value has the codec of the value; it breaks recursive types.
 impl<'p, T: PacketWriter<'p>> PacketWriter<'p> for Box<T> {
     fn read(buf: &mut &'p [u8]) -> Result<Self, DecodeError> {
+        let _nesting = Nesting::enter()?;
+
         Ok(Box::new(T::read(buf)?))
     }
 
