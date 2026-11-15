@@ -1,208 +1,137 @@
-//! One client's session: the proxy answers the handshake, relays status and
-//! login packet by packet, then pumps configuration and play.
-//!
-//! The client leg is never encrypted. Compression is mirrored: when the
-//! server enables it, the proxy forwards the same threshold to the client,
-//! so frames pass through both legs unchanged.
+//! One client's session as handlers and tasks see it: its sockets, its
+//! tasks and subscriptions, and the state every session shares.
 
-use std::io;
+use std::cell::RefCell;
+use std::future::Future;
 use std::rc::Rc;
 
-use futures_lite::future::zip;
-use glommio::net::TcpStream;
-use mc_protocol::packets::client::LoginDisconnect;
-use mc_protocol::packets::server::{LoginStart, ServerListPing};
-use mc_protocol::packets::{Clientbound, Serverbound};
-use mc_protocol::state::HandshakeIntent;
-use mc_protocol::{Direction, IntoOwned, Payload, State};
+use mc_protocol::State;
+use mc_protocol::packets::PacketKind;
 
-use crate::Config;
-use crate::connection::Connection;
-use crate::frame::FrameBuffer;
-use crate::handlers::Handlers;
-use crate::invalid_data;
-use crate::online::answer_encryption;
-use crate::outlet::{Client, Outlet, Server};
-use crate::pump::{Pump, Shared};
-use crate::split::ReadHalf;
-use crate::stream::Reader;
+use crate::handlers::{Context, Interest};
+use crate::outlet::{Client, Server};
+use crate::subscription::{Subscription, Subscriptions};
+use crate::tasks::{TaskHandle, Tasks};
 
-/// Serves one client connection until either side closes it.
-pub async fn serve<S, H: Handlers<S>>(client: TcpStream, config: &Config, shared: &Rc<Shared<S, H>>) -> io::Result<()> {
-    let mut client = Connection::new(client)?;
+/// What every session of one proxy shares.
+pub struct Shared<S> {
+    /// The state given to the proxy.
+    pub state: RefCell<S>,
+    /// Packet kinds whose handlers are turned off.
+    pub disabled: RefCell<Interest>,
+}
 
-    let Some(Serverbound::ServerListPing(handshake)) = client.read_serverbound(State::Handshake).await? else {
-        return Err(invalid_data("expected a handshake"));
-    };
-    let version = handshake.version;
-    let intent = handshake.next_state;
+impl<S> Shared<S> {
+    pub fn new(state: S) -> Self {
+        Self { state: RefCell::new(state), disabled: RefCell::new(Interest::NONE) }
+    }
+}
 
-    let upstream = &config.upstream;
-    let server = TcpStream::connect((upstream.host.as_str(), upstream.port)).await?;
-    let mut server = Connection::new(server)?;
+/// One client's session. Cloning it is cheap; move a clone into a task to
+/// send packets, read the state or subscribe from there.
+///
+/// Tasks spawned through it are cancelled, and its subscriptions end, when
+/// the session does.
+pub struct Session<S> {
+    pub client: Client,
+    pub server: Server,
+    shared: Rc<Shared<S>>,
+    tasks: Rc<Tasks>,
+    subscriptions: Rc<Subscriptions>,
+}
 
-    // The server sees the address it is reached at, not the proxy's.
-    let handshake = ServerListPing { version, addr: upstream.host.as_str().into(), port: upstream.port, next_state: intent };
-    server.send(|out| handshake.encode(out)).await?;
-
-    match intent {
-        HandshakeIntent::Status => relay_status(&mut client, &mut server).await,
-        HandshakeIntent::Login | HandshakeIntent::Transfer => {
-            if !login(&mut client, &mut server, config).await? {
-                return Ok(());
-            }
-
-            pump_both(client, server, shared).await
+impl<S> Clone for Session<S> {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            server: self.server.clone(),
+            shared: self.shared.clone(),
+            tasks: self.tasks.clone(),
+            subscriptions: self.subscriptions.clone(),
         }
     }
 }
 
-/// Status is a strict request and response exchange.
-async fn relay_status(client: &mut Connection, server: &mut Connection) -> io::Result<()> {
-    while forward_serverbound(client, server, State::Status).await? {
-        if !forward_clientbound(server, client, State::Status).await? {
-            break;
-        }
+impl<S> Session<S> {
+    pub(crate) fn new(client: Client, server: Server, shared: Rc<Shared<S>>) -> Self {
+        Self { client, server, shared, tasks: Rc::default(), subscriptions: Rc::default() }
     }
 
-    Ok(())
-}
+    /// Runs `f` on the state given to the proxy. For tasks: handlers have
+    /// it as `cx.state`, and calling this from a handler panics.
+    pub fn with<R>(&self, f: impl FnOnce(&mut S) -> R) -> R {
+        let mut state = self.shared.state.try_borrow_mut().expect("handlers use cx.state rather than Session::with");
 
-/// Relays login until both sides enter configuration. Returns `false` when
-/// login ended without it.
-async fn login(client: &mut Connection, server: &mut Connection, config: &Config) -> io::Result<bool> {
-    let Some(Serverbound::LoginStart(login_start)) = client.read_serverbound(State::Login).await? else {
-        return Err(invalid_data("expected login start"));
-    };
-
-    // With an account, the server sees that account whatever the client claims.
-    let login_start = match &config.account {
-        Some(account) => LoginStart { name: account.name.as_str().into(), uuid: account.uuid },
-        None => login_start.into_owned(),
-    };
-    server.send(|out| login_start.encode(out)).await?;
-
-    loop {
-        let Some(packet) = server.read_clientbound(State::Login).await? else {
-            return Ok(false);
-        };
-
-        match packet {
-            Clientbound::LoginSuccess(_) => {
-                client.send(|out| packet.encode(out)).await?;
-                break;
-            }
-            Clientbound::LoginDisconnect(_) => {
-                client.send(|out| packet.encode(out)).await?;
-                return Ok(false);
-            }
-            // The client answers each request with exactly one response.
-            Clientbound::LoginPluginRequest(_) | Clientbound::LoginCookieRequest(_) => {
-                client.send(|out| packet.encode(out)).await?;
-
-                if !forward_serverbound(client, server, State::Login).await? {
-                    return Ok(false);
-                }
-            }
-            // Only the server leg is encrypted, so the client never sees this.
-            Clientbound::EncryptionRequest(request) => {
-                let Some(account) = &config.account else {
-                    return refuse(client, "This server is in online mode: start Kagami with your Minecraft account").await;
-                };
-
-                let request = request.into_owned();
-
-                if let Err(error) = answer_encryption(server, &request, account).await {
-                    return refuse(client, &error.to_string()).await;
-                }
-            }
-            Clientbound::SetCompression(compression) => {
-                client.send(|out| compression.encode(out)).await?;
-
-                client.set_compression(compression.threshold);
-                server.set_compression(compression.threshold);
-            }
-            _ => return Err(invalid_data("unexpected login packet")),
-        }
+        f(&mut state)
     }
 
-    let Some(Serverbound::LoginAcknowledge(acknowledge)) = client.read_serverbound(State::Login).await? else {
-        return Err(invalid_data("expected login acknowledgement"));
-    };
-    server.send(|out| acknowledge.encode(out)).await?;
+    /// Runs `task` next to the pumps, until it finishes, is stopped through
+    /// the returned handle, or the session ends.
+    ///
+    /// The task never blocks packets, but it runs on the proxy's only
+    /// thread: blocking calls belong in `glommio::executor().spawn_blocking`.
+    pub fn spawn(&self, task: impl Future<Output = ()> + 'static) -> TaskHandle {
+        self.tasks.spawn(task)
+    }
 
-    Ok(true)
-}
+    /// Copies every `K` packet of this session to the returned subscription,
+    /// as it arrives and before handlers see it, until it is dropped.
+    pub fn subscribe<K: PacketKind>(&self) -> Subscription<K> {
+        const {
+            assert!(
+                matches!(K::STATE, State::Config | State::Play),
+                "subscriptions only see configuration and play packets"
+            );
+        }
 
-/// Tells the client why login stopped, then fails the session with the same reason.
-async fn refuse(client: &mut Connection, reason: &str) -> io::Result<bool> {
-    let json = serde_json::json!({ "text": reason }).to_string();
-    let disconnect = LoginDisconnect { reason: json.into() };
-    client.send(|out| disconnect.encode(out)).await?;
+        self.subscriptions.subscribe::<K>()
+    }
 
-    Err(io::Error::other(reason.to_owned()))
-}
+    /// Turns the handlers of `K` packets back on.
+    pub fn enable<K: PacketKind>(&self) {
+        let mut disabled = self.shared.disabled.borrow_mut();
 
-/// Sends the client's next packet to the server. Returns `false` at the end of the stream.
-async fn forward_serverbound(client: &mut Connection, server: &mut Connection, state: State) -> io::Result<bool> {
-    let Some(packet) = client.read_serverbound(state).await? else {
-        return Ok(false);
-    };
-    server.send(|out| packet.encode(out)).await?;
+        *disabled = disabled.without(K::DIRECTION, K::STATE, K::ID);
+    }
 
-    Ok(true)
-}
+    /// Turns off every handler of `K` packets, in every session, until
+    /// [`enable`](Self::enable). `K` packets are then forwarded without
+    /// being decoded. A packet being handled still reaches the rest of its
+    /// handlers.
+    pub fn disable<K: PacketKind>(&self) {
+        let mut disabled = self.shared.disabled.borrow_mut();
 
-/// Sends the server's next packet to the client. Returns `false` at the end of the stream.
-async fn forward_clientbound(server: &mut Connection, client: &mut Connection, state: State) -> io::Result<bool> {
-    let Some(packet) = server.read_clientbound(state).await? else {
-        return Ok(false);
-    };
-    client.send(|out| packet.encode(out)).await?;
+        *disabled = disabled.with(K::DIRECTION, K::STATE, K::ID);
+    }
 
-    Ok(true)
-}
+    /// Whether the handlers of `K` packets are on.
+    pub fn is_enabled<K: PacketKind>(&self) -> bool {
+        !self.shared.disabled.borrow().contains(K::DIRECTION, K::STATE, K::ID)
+    }
 
-/// Pumps both directions, starting in configuration, until both have ended.
-async fn pump_both<S, H: Handlers<S>>(client: Connection, server: Connection, shared: &Rc<Shared<S, H>>) -> io::Result<()> {
-    let client = client.into_parts();
-    let server = server.into_parts();
-    debug_assert_eq!(client.compressed, server.compressed, "compression is mirrored");
+    /// The packet kinds whose handlers are turned off.
+    pub(crate) fn disabled(&self) -> Interest {
+        *self.shared.disabled.borrow()
+    }
 
-    let compressed = server.compressed;
-    let client_outlet = Client(Rc::new(Outlet::new(client.writer, compressed)));
-    let server_outlet = Server(Rc::new(Outlet::new(server.writer, compressed)));
+    pub(crate) fn subscriptions(&self) -> &Subscriptions {
+        &self.subscriptions
+    }
 
-    let mut to_server = Pump::new(Direction::Serverbound, compressed, shared.clone(), client_outlet.clone(), server_outlet.clone());
-    let mut to_client = Pump::new(Direction::Clientbound, compressed, shared.clone(), client_outlet.clone(), server_outlet.clone());
+    /// Runs `f` with the context handlers get.
+    pub(crate) fn with_context<R>(&self, f: impl FnOnce(&mut Context<'_, S>) -> R) -> R {
+        let mut state = self.shared.state.borrow_mut();
+        let mut cx = Context { state: &mut *state, client: &self.client, server: &self.server, session: self };
 
-    let pumps = async {
-        let to_server = pump_until_closed(&mut to_server, client.buffer, client.reader);
-        let to_client = pump_until_closed(&mut to_client, server.buffer, server.reader);
-        let pumped = zip(to_server, to_client).await;
+        f(&mut cx)
+    }
 
-        client_outlet.0.close();
-        server_outlet.0.close();
-
-        pumped
-    };
-    // A flusher fails only when its socket is gone, which the pumps report.
-    let flushers = zip(client_outlet.0.flush_when_woken(), server_outlet.0.flush_when_woken());
-    let ((to_server, to_client), _) = zip(pumps, flushers).await;
-
-    to_server.and(to_client)
-}
-
-/// When one direction ends, it closes the socket it was writing to. That
-/// ends the other direction's read on the same socket, so no read is ever
-/// cancelled mid-flight.
-async fn pump_until_closed<S, H: Handlers<S>>(
-    pump: &mut Pump<S, H>, mut buffer: FrameBuffer, mut reader: Reader<ReadHalf>,
-) -> io::Result<()> {
-    let pumped = pump.run(&mut buffer, &mut reader).await;
-
-    // The peer may already be gone; the pump's own result is what matters.
-    let _ = pump.target().shutdown().await;
-
-    pumped
+    /// Ends the session's tasks and subscriptions. Packets sent afterwards
+    /// are discarded.
+    pub(crate) fn close(&self) {
+        self.tasks.close();
+        self.subscriptions.close();
+        self.client.0.close();
+        self.server.0.close();
+    }
 }

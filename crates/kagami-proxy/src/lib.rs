@@ -4,6 +4,9 @@
 //! machine. It answers the handshake itself, relays status and login packet
 //! by packet, and then forwards configuration and play frames unchanged.
 //! Online-mode servers are joined with the caller's [`Account`].
+//!
+//! Handlers run inline on the frames they want. Anything that takes time
+//! is a task spawned in the client's [`Session`], cancelled when it ends.
 //! Linux only: it runs on Glommio's io_uring executor, on one thread.
 
 mod cipher;
@@ -14,9 +17,12 @@ mod handlers;
 mod online;
 mod outlet;
 mod pump;
+mod serve;
 mod session;
 mod split;
 mod stream;
+mod subscription;
+mod tasks;
 mod transition;
 
 use std::cell::RefCell;
@@ -28,12 +34,15 @@ use std::rc::Rc;
 use glommio::LocalExecutorBuilder;
 use glommio::net::TcpListener;
 
-use crate::pump::Shared;
-use crate::session::serve;
+use crate::serve::serve;
+use crate::session::Shared;
 
 pub use handlers::{Action, Context, Handlers, Interest};
 pub use online::Account;
 pub use outlet::{Client, Server};
+pub use session::Session;
+pub use subscription::Subscription;
+pub use tasks::TaskHandle;
 
 const DEFAULT_PORT: u16 = 25565;
 
@@ -75,23 +84,27 @@ pub struct Config {
 /// `handlers` on the packets they want. Starts its own single-threaded
 /// executor and blocks the calling thread.
 pub fn run<S: 'static, H: Handlers<S> + 'static>(config: Config, state: S, handlers: H) -> io::Result<()> {
-    let shared = Rc::new(Shared { state: RefCell::new(state), handlers: RefCell::new(handlers) });
+    let shared = Rc::new(Shared::new(state));
+    let handlers = Rc::new(RefCell::new(handlers));
     let executor = LocalExecutorBuilder::default().name("kagami").make()?;
 
-    executor.run(accept_forever(Rc::new(config), shared))
+    executor.run(accept_forever(Rc::new(config), shared, handlers))
 }
 
-async fn accept_forever<S: 'static, H: Handlers<S> + 'static>(config: Rc<Config>, shared: Rc<Shared<S, H>>) -> io::Result<()> {
+async fn accept_forever<S: 'static, H: Handlers<S> + 'static>(
+    config: Rc<Config>, shared: Rc<Shared<S>>, handlers: Rc<RefCell<H>>,
+) -> io::Result<()> {
     let listener = TcpListener::bind(config.listen)?;
 
     loop {
         let client = listener.accept().await?;
         let config = config.clone();
         let shared = shared.clone();
+        let handlers = handlers.clone();
 
         // Server list pings open their own short connections next to a game session.
         glommio::spawn_local(async move {
-            if let Err(error) = serve(client, &config, &shared).await {
+            if let Err(error) = serve(client, &config, &shared, &handlers).await {
                 eprintln!("kagami: session ended: {error}");
             }
         })
@@ -99,21 +112,31 @@ async fn accept_forever<S: 'static, H: Handlers<S> + 'static>(config: Rc<Config>
     }
 }
 
-/// Builds handlers' context outside a session, for tests of handler chains.
+/// Builds handlers' context outside a proxy, for tests of handler chains.
 #[doc(hidden)]
 pub mod testing {
     use std::rc::Rc;
 
     use glommio::net::{TcpListener, TcpStream};
 
+    use crate::handlers::Context;
     use crate::outlet::{Client, Outlet, Server};
+    use crate::session::{Session, Shared};
     use crate::split::split;
     use crate::stream::Writer;
 
-    /// Handles writing to loopback sockets nobody reads. Call it inside a
+    /// A session over `state` whose sockets nobody reads. Call it inside a
     /// Glommio executor.
-    pub async fn handles() -> (Client, Server) {
-        (Client(outlet().await), Server(outlet().await))
+    pub async fn session<S>(state: S) -> Session<S> {
+        let client = Client(outlet().await);
+        let server = Server(outlet().await);
+
+        Session::new(client, server, Rc::new(Shared::new(state)))
+    }
+
+    /// Runs `f` with the context handlers get in `session`.
+    pub fn with_context<S, R>(session: &Session<S>, f: impl FnOnce(&mut Context<'_, S>) -> R) -> R {
+        session.with_context(f)
     }
 
     async fn outlet() -> Rc<Outlet> {

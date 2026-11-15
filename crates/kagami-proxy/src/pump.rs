@@ -15,31 +15,29 @@ use mc_protocol::{Direction, PacketWriter, State, VarInt};
 
 use crate::compression::{Inflater, add_zero_data_length};
 use crate::frame::{FrameBuffer, FrameHeader};
-use crate::handlers::{Action, Context, Handlers, Interest};
+use crate::handlers::{Action, Handlers, Interest};
 use crate::invalid_data;
-use crate::outlet::{Client, Outlet, Server};
+use crate::outlet::Outlet;
+use crate::session::Session;
 use crate::transition::next_state;
-
-/// The handlers and their state, shared by every pump of every session.
-pub struct Shared<S, H> {
-    pub state: RefCell<S>,
-    pub handlers: RefCell<H>,
-}
 
 pub struct Pump<S, H> {
     direction: Direction,
     state: State,
     /// Set when both legs use the compressed framing.
     inflater: Option<Inflater>,
-    /// A runtime copy of the handlers' interest.
+    /// The packets wanted by handlers that are on, or by subscriptions. Only
+    /// handlers and tasks change it, so it is refreshed before each scan and
+    /// after handlers run.
     interest: Interest,
-    shared: Rc<Shared<S, H>>,
-    client: Client,
-    server: Server,
+    /// Shared by every session.
+    handlers: Rc<RefCell<H>>,
+    session: Session<S>,
     /// Holds a handled packet that arrived compressed.
     inflated: Vec<u8>,
-    /// Holds an edited packet, encoded again.
-    replacement: Vec<u8>,
+    /// Written after the run: the handled packet when it was edited, then
+    /// the packets its handlers sent to this pump's socket.
+    tail: Vec<u8>,
 }
 
 /// What to write for the frames at the start of the buffer.
@@ -48,22 +46,28 @@ struct Step {
     /// Bytes to write as they were read.
     run: usize,
     /// Bytes after the run that are consumed without being written: a frame
-    /// that was dropped, or replaced by `Pump::replacement`.
+    /// that was dropped, or replaced by an edit in `Pump::tail`.
     skipped: usize,
 }
 
+/// Who wants a frame besides the socket it goes to.
+#[derive(Clone, Copy)]
+struct Wanted {
+    handlers: bool,
+    subscriptions: bool,
+}
+
 impl<S, H: Handlers<S>> Pump<S, H> {
-    pub fn new(direction: Direction, compressed: bool, shared: Rc<Shared<S, H>>, client: Client, server: Server) -> Self {
+    pub fn new(direction: Direction, compressed: bool, handlers: Rc<RefCell<H>>, session: Session<S>) -> Self {
         Self {
             direction,
             state: State::Config,
             inflater: compressed.then(Inflater::new),
             interest: H::INTEREST,
-            shared,
-            client,
-            server,
+            handlers,
+            session,
             inflated: Vec::new(),
-            replacement: Vec::new(),
+            tail: Vec::new(),
         }
     }
 
@@ -86,38 +90,25 @@ impl<S, H: Handlers<S>> Pump<S, H> {
                 return Ok(());
             }
 
-            let target = match self.direction {
-                Direction::Serverbound => &self.server.0,
-                Direction::Clientbound => &self.client.0,
-            };
+            let target = target(self.direction, &self.session);
             let run = &mut buffer.pending_mut()[..step.run];
-            target.write(run, &mut self.replacement).await?;
+            target.write(run, &mut self.tail).await?;
 
             buffer.consume(step.run + step.skipped);
-            self.replacement.clear();
+            self.tail.clear();
         }
     }
 
     /// The socket this pump writes to.
     pub fn target(&self) -> &Outlet {
-        match self.direction {
-            Direction::Serverbound => &self.server.0,
-            Direction::Clientbound => &self.client.0,
-        }
-    }
-
-    /// The socket the other pump writes to.
-    fn other(&self) -> &Outlet {
-        match self.direction {
-            Direction::Serverbound => &self.client.0,
-            Direction::Clientbound => &self.server.0,
-        }
+        target(self.direction, &self.session)
     }
 
     /// Walks the complete frames at the start of `bytes`, running handlers on
     /// the frames they want, and stops where something must be written:
     /// after a frame whose handlers changed its fate or sent packets.
     fn scan(&mut self, bytes: &[u8]) -> io::Result<Step> {
+        self.refresh_interest();
         let mut run = 0;
 
         while let Some(header) = FrameHeader::parse(&bytes[run..])? {
@@ -143,19 +134,19 @@ impl<S, H: Handlers<S>> Pump<S, H> {
                 continue;
             }
 
-            let action = self.handle(body)?;
-
-            // Packets sent to the other socket are written by its flusher.
-            if self.other().has_outbox() {
-                self.other().wake_flusher();
-            }
+            let action = self.handle(id, body)?;
+            self.refresh_interest();
 
             if action != Action::Drop {
                 self.state = next_state(self.direction, self.state, id);
             }
 
+            // Packets the handlers sent to this socket go out right after
+            // this frame, ahead of anything a task sends later.
+            target(self.direction, &self.session).take_outbox(&mut self.tail);
+
             match action {
-                Action::Forward if !self.target().has_outbox() => run = frame_end,
+                Action::Forward if self.tail.is_empty() => run = frame_end,
                 Action::Forward => return Ok(Step { run: frame_end, skipped: 0 }),
                 Action::Modified | Action::Drop => return Ok(Step { run, skipped: frame_end - run }),
             }
@@ -164,28 +155,50 @@ impl<S, H: Handlers<S>> Pump<S, H> {
         Ok(Step { run, skipped: 0 })
     }
 
-    /// Decodes one frame body and runs the handlers on it. An edited packet
-    /// is encoded into `replacement`. A packet that does not decode is
-    /// forwarded as it is.
-    fn handle(&mut self, body: &[u8]) -> io::Result<Action> {
+    fn refresh_interest(&mut self) {
+        let handled = H::INTEREST.difference(self.session.disabled());
+
+        self.interest = handled.union(self.session.subscriptions().interest());
+    }
+
+    fn wanted(&self, id: u8) -> Wanted {
+        let handled = H::INTEREST.difference(self.session.disabled());
+        let handlers = handled.contains(self.direction, self.state, id);
+        let subscriptions = self.session.subscriptions().interest().contains(self.direction, self.state, id);
+
+        Wanted { handlers, subscriptions }
+    }
+
+    /// Copies one frame body to the subscriptions that want it, then decodes
+    /// it and runs the handlers on it. An edited packet is encoded into
+    /// `tail`. A packet that does not decode is forwarded as it is.
+    fn handle(&mut self, id: u8, body: &[u8]) -> io::Result<Action> {
+        let wanted = self.wanted(id);
+
         let packet = match &mut self.inflater {
             Some(inflater) => inflater.packet(body, &mut self.inflated)?,
             None => body,
         };
 
-        let mut state = self.shared.state.borrow_mut();
-        let mut handlers = self.shared.handlers.borrow_mut();
-        let mut cx = Context { state: &mut *state, client: &self.client, server: &self.server };
+        if wanted.subscriptions {
+            self.session.subscriptions().publish(self.direction, self.state, id, packet);
+        }
+
+        if !wanted.handlers {
+            return Ok(Action::Forward);
+        }
+
+        let mut handlers = self.handlers.borrow_mut();
 
         let action = match self.direction {
             Direction::Serverbound => {
                 let Ok(mut packet) = Serverbound::decode(self.state, packet) else {
                     return Ok(Action::Forward);
                 };
-                let action = handlers.serverbound(&mut packet, &mut cx);
+                let action = self.session.with_context(|cx| handlers.serverbound(&mut packet, cx));
 
                 if action == Action::Modified {
-                    packet.encode(&mut self.replacement).map_err(invalid_data)?;
+                    packet.encode(&mut self.tail).map_err(invalid_data)?;
                 }
 
                 action
@@ -194,10 +207,10 @@ impl<S, H: Handlers<S>> Pump<S, H> {
                 let Ok(mut packet) = Clientbound::decode(self.state, packet) else {
                     return Ok(Action::Forward);
                 };
-                let action = handlers.clientbound(&mut packet, &mut cx);
+                let action = self.session.with_context(|cx| handlers.clientbound(&mut packet, cx));
 
                 if action == Action::Modified {
-                    packet.encode(&mut self.replacement).map_err(invalid_data)?;
+                    packet.encode(&mut self.tail).map_err(invalid_data)?;
                 }
 
                 action
@@ -205,10 +218,18 @@ impl<S, H: Handlers<S>> Pump<S, H> {
         };
 
         if action == Action::Modified && self.inflater.is_some() {
-            add_zero_data_length(&mut self.replacement, 0)?;
+            add_zero_data_length(&mut self.tail, 0)?;
         }
 
         Ok(action)
+    }
+}
+
+/// The socket a pump going in `direction` writes to.
+fn target<S>(direction: Direction, session: &Session<S>) -> &Outlet {
+    match direction {
+        Direction::Serverbound => &session.server.0,
+        Direction::Clientbound => &session.client.0,
     }
 }
 

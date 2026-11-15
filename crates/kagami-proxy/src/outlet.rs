@@ -29,9 +29,14 @@ impl Outlet {
         Self { writer: Mutex::new(writer), outbox: RefCell::new(Vec::new()), compressed, pending: Semaphore::new(0) }
     }
 
-    /// Encodes `packet` into the outbox. It is written after the frame being
-    /// handled when this socket's pump runs the handler, or by the flusher.
+    /// Encodes `packet` into the outbox. Sent by a handler of this socket's
+    /// pump, it is written right after the frame being handled; otherwise
+    /// the flusher writes it. Discarded once the session is over.
     fn send<'p>(&self, packet: &impl Payload<'p>) {
+        if self.pending.is_closed() {
+            return;
+        }
+
         let mut outbox = self.outbox.borrow_mut();
         let start = outbox.len();
 
@@ -46,27 +51,44 @@ impl Outlet {
         if encoded.is_err() {
             debug_assert!(false, "a handler sent a packet that cannot be encoded");
             outbox.truncate(start);
+            return;
         }
+
+        self.wake_flusher();
     }
 
+    #[cfg(test)]
     pub fn has_outbox(&self) -> bool {
         !self.outbox.borrow().is_empty()
     }
 
-    /// Lets the flusher write the outbox, for packets sent to this socket
-    /// while its own pump may be waiting on a read.
-    pub fn wake_flusher(&self) {
+    /// Moves the outbox to the end of `tail`, for the pump to write after
+    /// the frame its handlers just saw.
+    pub fn take_outbox(&self, tail: &mut Vec<u8>) {
+        let mut outbox = self.outbox.borrow_mut();
+
+        if tail.is_empty() {
+            std::mem::swap(tail, &mut outbox);
+        } else {
+            tail.extend_from_slice(&outbox);
+            outbox.clear();
+        }
+    }
+
+    /// Lets the flusher write the outbox, for packets sent while this
+    /// socket's pump may be waiting on a read.
+    fn wake_flusher(&self) {
         if self.pending.available() == 0 {
             self.pending.signal(1);
         }
     }
 
-    /// Writes `run` (bytes from the pump's read buffer), then `replacement`,
-    /// then the outbox, in one hold of the lock.
-    pub async fn write(&self, run: &mut [u8], replacement: &mut [u8]) -> io::Result<()> {
+    /// Writes `run` (bytes from the pump's read buffer), then `tail`, then
+    /// the outbox, in one hold of the lock.
+    pub async fn write(&self, run: &mut [u8], tail: &mut [u8]) -> io::Result<()> {
         let mut writer = self.writer.lock().await.map_err(io::Error::other)?;
         writer.write_all_in_place(run).await?;
-        writer.write_all_in_place(replacement).await?;
+        writer.write_all_in_place(tail).await?;
 
         Self::write_outbox(&self.outbox, &mut writer).await
     }
@@ -82,7 +104,7 @@ impl Outlet {
         Ok(())
     }
 
-    /// Stops the flusher once the session is over.
+    /// Stops the flusher and discards later packets once the session is over.
     pub fn close(&self) {
         self.pending.close();
     }
@@ -124,7 +146,8 @@ pub struct Server(pub(crate) Rc<Outlet>);
 
 impl Client {
     /// Queues a clientbound packet. Sent while handling a clientbound packet,
-    /// it goes out right after it, or in its place when it was dropped.
+    /// it goes out right after it, or in its place when it was dropped. Sent
+    /// from a task, it goes out as soon as the socket is free.
     pub fn send<'p, P: Payload<'p>>(&self, packet: &P) {
         const { assert!(matches!(P::DIRECTION, Direction::Clientbound), "only clientbound packets can be sent to the client") };
 
@@ -134,7 +157,8 @@ impl Client {
 
 impl Server {
     /// Queues a serverbound packet. Sent while handling a serverbound packet,
-    /// it goes out right after it, or in its place when it was dropped.
+    /// it goes out right after it, or in its place when it was dropped. Sent
+    /// from a task, it goes out as soon as the socket is free.
     pub fn send<'p, P: Payload<'p>>(&self, packet: &P) {
         const { assert!(matches!(P::DIRECTION, Direction::Serverbound), "only serverbound packets can be sent to the server") };
 

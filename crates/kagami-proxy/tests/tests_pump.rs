@@ -14,6 +14,9 @@ use mc_protocol::types::Nbt;
 
 use super::*;
 use crate::frame::tests::Chunks;
+use crate::handlers::{Context, Interest};
+use crate::outlet::{Client, Server};
+use crate::session::Shared;
 use crate::split::split;
 use crate::stream::Writer;
 
@@ -39,6 +42,11 @@ fn frame<'p>(packet: &impl Payload<'p>) -> Vec<u8> {
 
 fn command(text: &str) -> Vec<u8> {
     frame(&ChatCommand { command: text.into() })
+}
+
+/// A session over two outlets, sharing `state`.
+fn session<S>(client: &Rc<Outlet>, server: &Rc<Outlet>, state: S) -> Session<S> {
+    Session::new(Client(client.clone()), Server(server.clone()), Rc::new(Shared::new(state)))
 }
 
 /// Counts chat commands in the state and acts on their text.
@@ -78,8 +86,8 @@ fn handlers_drop_edit_and_send_after_their_packet() {
     LocalExecutorBuilder::default().make().unwrap().run(async {
         let (client, _client_peer) = outlet().await;
         let (server, mut server_peer) = outlet().await;
-        let shared = Rc::new(Shared { state: RefCell::new(0), handlers: RefCell::new(Commands) });
-        let mut pump = Pump::new(Direction::Serverbound, false, shared.clone(), Client(client.clone()), Server(server));
+        let session = session(&client, &server, 0);
+        let mut pump = Pump::new(Direction::Serverbound, false, Rc::new(RefCell::new(Commands)), session.clone());
 
         // Chat commands only have handlers in Play, which the acknowledgement starts.
         let acknowledge = frame(&AcknowledgeFinish);
@@ -93,7 +101,7 @@ fn handlers_drop_edit_and_send_after_their_packet() {
         let mut written = vec![0; expected.len()];
         server_peer.read_exact(&mut written).await.unwrap();
         assert_eq!(written, expected);
-        assert_eq!(*shared.state.borrow(), 4);
+        assert_eq!(session.with(|count| *count), 4);
         // The reply to the client waits for the client's flusher.
         assert!(client.has_outbox());
     });
@@ -104,8 +112,8 @@ fn state_changes_are_found_inside_compressed_frames() {
     LocalExecutorBuilder::default().make().unwrap().run(async {
         let (client, _client_peer) = outlet().await;
         let (server, _server_peer) = outlet().await;
-        let shared = Rc::new(Shared { state: RefCell::new(()), handlers: RefCell::new(()) });
-        let mut pump = Pump::new(Direction::Clientbound, true, shared, Client(client), Server(server));
+        let session = session(&client, &server, ());
+        let mut pump = Pump::new(Direction::Clientbound, true, Rc::new(RefCell::new(())), session);
 
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(&[0x03]).unwrap();
@@ -117,5 +125,34 @@ fn state_changes_are_found_inside_compressed_frames() {
 
         assert_eq!(pump.scan(&frame).unwrap(), Step { run: frame.len(), skipped: 0 });
         assert_eq!(pump.state, State::Play);
+    });
+}
+
+#[test]
+fn disabled_handlers_skip_their_packets_while_subscriptions_still_get_copies() {
+    LocalExecutorBuilder::default().make().unwrap().run(async {
+        let (client, _client_peer) = outlet().await;
+        let (server, mut server_peer) = outlet().await;
+        let session = session(&client, &server, 0);
+        let mut pump = Pump::new(Direction::Serverbound, false, Rc::new(RefCell::new(Commands)), session.clone());
+
+        session.disable::<ChatCommand>();
+        let mut commands = session.subscribe::<ChatCommand>();
+
+        let input = [frame(&AcknowledgeFinish), command("drop")].concat();
+        let mut reader = Chunks([input.clone()].into());
+        pump.run(&mut FrameBuffer::new(), &mut reader).await.unwrap();
+
+        // The handler would have dropped it and counted it.
+        let mut written = vec![0; input.len()];
+        server_peer.read_exact(&mut written).await.unwrap();
+        assert_eq!(written, input);
+        assert_eq!(session.with(|count| *count), 0);
+
+        let copy = commands.next().await.unwrap();
+        assert_eq!(copy.command, "drop");
+
+        session.close();
+        assert!(commands.next().await.is_none());
     });
 }

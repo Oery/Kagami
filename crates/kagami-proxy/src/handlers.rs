@@ -1,10 +1,14 @@
 //! The interface between the pumps and user code: which packets have
 //! handlers, what the handlers decided, and what they may touch.
 
+use std::future::Future;
+
 use mc_protocol::packets::{Clientbound, Serverbound};
 use mc_protocol::{Direction, State};
 
 use crate::outlet::{Client, Server};
+use crate::session::Session;
+use crate::tasks::TaskHandle;
 
 /// What happens to a packet once its handlers ran.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,7 +37,7 @@ const STATES: usize = 5;
 
 /// One bit per packet id, per direction and state: the packets that have
 /// handlers. Every other packet is forwarded without being decoded.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Interest {
     bits: [[[u64; 4]; STATES]; 2],
 }
@@ -44,6 +48,37 @@ impl Interest {
     pub const fn with(mut self, direction: Direction, state: State, id: u8) -> Interest {
         let (word, bit) = Self::position(id);
         self.bits[direction as usize][state as usize][word] |= bit;
+
+        self
+    }
+
+    pub const fn without(mut self, direction: Direction, state: State, id: u8) -> Interest {
+        let (word, bit) = Self::position(id);
+        self.bits[direction as usize][state as usize][word] &= !bit;
+
+        self
+    }
+
+    /// The packets in `self`, `other`, or both.
+    pub fn union(mut self, other: Interest) -> Interest {
+        let words = self.bits.as_flattened_mut().as_flattened_mut();
+        let others = other.bits.as_flattened().as_flattened();
+
+        for (word, other) in words.iter_mut().zip(others) {
+            *word |= other;
+        }
+
+        self
+    }
+
+    /// The packets in `self` but not in `other`.
+    pub fn difference(mut self, other: Interest) -> Interest {
+        let words = self.bits.as_flattened_mut().as_flattened_mut();
+        let others = other.bits.as_flattened().as_flattened();
+
+        for (word, other) in words.iter_mut().zip(others) {
+            *word &= !other;
+        }
 
         self
     }
@@ -65,6 +100,18 @@ pub struct Context<'a, S> {
     pub state: &'a mut S,
     pub client: &'a Client,
     pub server: &'a Server,
+    /// The session the packet belongs to, for subscribing, toggling
+    /// handlers, or cloning into a task.
+    pub session: &'a Session<S>,
+}
+
+impl<S> Context<'_, S> {
+    /// Runs `task` next to the pumps, until it finishes, is stopped through
+    /// the returned handle, or the session ends. The handler returns without
+    /// waiting for it.
+    pub fn spawn(&self, task: impl Future<Output = ()> + 'static) -> TaskHandle {
+        self.session.spawn(task)
+    }
 }
 
 /// Runs the handlers registered for a packet. Users build it by chaining
