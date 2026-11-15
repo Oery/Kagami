@@ -799,6 +799,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kagami"
+version = "0.1.0"
+dependencies = [
+ "glommio-ng",
+ "kagami-proxy",
+ "mc_protocol",
+]
+
+[[package]]
 name = "kagami-proxy"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,14 @@
+[package]
+name = "kagami"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+# `tests/` holds unit tests included from `src` with `#[path]`, not integration tests.
+autotests = false
+
+[dependencies]
+kagami-proxy = { path = "../kagami-proxy" }
+mc_protocol = { path = "../mc-protocol" }
+
+[dev-dependencies]
+glommio = { package = "glommio-ng", version = "0.12" }
