@@ -1,12 +1,11 @@
 //! Protocol 777 boss events (Minecraft Wiki, cross-checked with the 26.3 client).
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 use uuid::Uuid;
 
-use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::error::DecodeError;
-use crate::packets::{PacketWriter, Payload};
+use crate::packets::PacketWriter;
 use crate::types::{Nbt, VarInt};
 
 macro_rules! ordinal {

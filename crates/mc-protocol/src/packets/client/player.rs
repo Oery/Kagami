@@ -1,13 +1,8 @@
 //! The Play login packet.
 
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 
 use super::DeathLocation;
-use crate::State;
-use crate::decode::Result as DecodeResult;
-use crate::encode::Result as EncodeResult;
-use crate::packets::{PacketWriter, Payload};
-use crate::types::VarInt;
 
 #[packet(Play, 0x32, Client)]
 pub struct PlayLogin<'p> {

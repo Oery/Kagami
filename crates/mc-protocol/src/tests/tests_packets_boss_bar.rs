@@ -1,4 +1,5 @@
 use super::*;
+use crate::Payload;
 
 fn check(action: BossBarAction<'_>, expected: &[u8]) {
     let packet = BossBar { id: Uuid::from_bytes([0x42; 16]), action };

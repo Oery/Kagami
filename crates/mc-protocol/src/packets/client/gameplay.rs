@@ -1,11 +1,10 @@
 //! Screens, respawn and combat packets for protocol 777.
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 
-use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
-use crate::packets::{PacketWriter, Payload};
-use crate::types::{Nbt, VarInt};
+use crate::packets::PacketWriter;
+use crate::types::Nbt;
 
 // Protocol 777; verified against the 26.3 client screen codecs and MenuType registry.
 #[packet(Play, 0x3C, Client)]

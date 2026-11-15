@@ -1,4 +1,5 @@
 use super::*;
+use crate::{PacketWriter, Payload, VarInt};
 
 fn frame<P: Payload<'static>>(packet: &P) -> Vec<u8> {
     let mut bytes = Vec::new();

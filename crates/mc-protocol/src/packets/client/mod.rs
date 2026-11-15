@@ -1,13 +1,6 @@
-use crate::State;
-use crate::decode::Result as DecodeResult;
-use crate::encode::Result as EncodeResult;
-use crate::packets::PacketWriter;
-use crate::packets::Payload;
-use crate::types::{
-    BlockEntity, GameProfile, Heightmap, KnownPack, LightData, Nbt, RegistryEntry, TaggedRegistry, VarInt, bytes::Remainder,
-};
+use crate::types::{BlockEntity, GameProfile, Heightmap, KnownPack, LightData, Nbt, RegistryEntry, TaggedRegistry, bytes::Remainder};
 
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 use uuid::Uuid;
 
 mod boss_bar;

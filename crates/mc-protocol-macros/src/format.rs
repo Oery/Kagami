@@ -3,7 +3,6 @@ use syn::{Attribute, Expr, ExprLit, Lit, Meta};
 pub enum Format {
     Standard,
     VarInt,
-    Json,
 }
 
 impl Format {
@@ -20,11 +19,10 @@ impl Format {
         {
             return match name.value().as_str() {
                 "varint" => Ok(Self::VarInt),
-                "json" => Ok(Self::Json),
-                _ => Err(syn::Error::new_spanned(name, "expected varint or json")),
+                _ => Err(syn::Error::new_spanned(name, "expected varint")),
             };
         }
-        Err(syn::Error::new_spanned(attr, "expected #[format = \"varint\"] or #[format = \"json\"]"))
+        Err(syn::Error::new_spanned(attr, "expected #[format = \"varint\"]"))
     }
 }
 

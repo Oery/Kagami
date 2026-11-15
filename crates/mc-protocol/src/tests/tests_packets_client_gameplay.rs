@@ -1,4 +1,5 @@
 use super::*;
+use crate::{PacketWriter, Payload, VarInt};
 
 #[test]
 fn damage_event_entity_ids_remain_varints_after_documentation_attributes() {

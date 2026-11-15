@@ -72,6 +72,7 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
         State::Config => quote!(Config),
         State::Play => quote!(Play),
     };
+
     let mut decodes = Vec::new();
     let mut encodes = Vec::new();
     let mut lengths = Vec::new();
@@ -80,65 +81,57 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
         let ty = &field.ty;
         let (decode, encode, length) = match Format::parse(&field.attrs)? {
             Format::Standard => (
-                quote!(let #ident = <#ty>::read(buf)?;),
-                quote!(self.#ident.encode(out)?;),
-                quote!(self.#ident.body_len()),
+                quote!(let #ident = <#ty as ::mc_protocol::PacketWriter>::read(buf)?;),
+                quote!(::mc_protocol::PacketWriter::encode(&self.#ident, out)?;),
+                quote!(::mc_protocol::PacketWriter::body_len(&self.#ident)),
             ),
             Format::VarInt => {
                 // i32 needs no fallible conversion; other integer fields retain
                 // their checked conversion from the signed wire value.
+                let read = quote!(<::mc_protocol::VarInt as ::mc_protocol::PacketWriter>::read(buf)?.0);
                 let value = match ty {
-                    Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "i32") => {
-                        quote!(VarInt::read(buf)?.0)
-                    }
-                    _ => quote!(VarInt::read(buf)?.0.try_into()?),
+                    Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "i32") => read,
+                    _ => quote!(#read.try_into()?),
                 };
+                let varint = quote!(::mc_protocol::VarInt(self.#ident as i32));
                 (
                     quote!(let #ident: #ty = #value;),
-                    quote!(VarInt(self.#ident as i32).encode(out)?;),
-                    quote!(VarInt(self.#ident as i32).body_len()),
+                    quote!(::mc_protocol::PacketWriter::encode(&#varint, out)?;),
+                    quote!(::mc_protocol::PacketWriter::body_len(&#varint)),
                 )
             }
-            Format::Json => (
-                quote! {
-                    let json: &str = <&str>::read(buf)?;
-                    let #ident: #ty = serde_json::from_str(json)?;
-                },
-                quote! {
-                    let json = serde_json::to_string(&self.#ident)?;
-                    json.as_str().encode(out)?;
-                },
-                quote!(serde_json::to_string(&self.#ident)?.as_str().body_len()),
-            ),
         };
         decodes.push(decode);
         encodes.push(encode);
         lengths.push(length);
     }
+
     let names = fields.iter().map(|field| &field.ident);
     let construct = if matches!(data.fields, Fields::Unit) {
         quote!(Self)
     } else {
         quote!(Self { #(#names),* })
     };
+    let item = without_format_attributes(item);
+
     Ok(quote! {
-        #[derive(Payload, Debug)]
+        #[derive(Debug)]
         #item
 
-        impl #impl_generics Payload<#lifetime> for #name #ty_generics #where_clause {
-            const ID: VarInt = VarInt(#id);
-            const STATE: State = State::#state;
+        impl #impl_generics ::mc_protocol::Payload<#lifetime> for #name #ty_generics #where_clause {
+            const ID: ::mc_protocol::VarInt = ::mc_protocol::VarInt(#id);
+            const STATE: ::mc_protocol::State = ::mc_protocol::State::#state;
 
-            fn payload_len(&self) -> EncodeResult<usize> {
+            fn payload_len(&self) -> ::mc_protocol::encode::Result<usize> {
                 Ok(0 #(+ #lengths)*)
             }
 
-            fn decode_payload(buf: &mut &#lifetime [u8]) -> DecodeResult<Self> {
+            fn decode_payload(buf: &mut &#lifetime [u8]) -> ::mc_protocol::decode::Result<Self> {
                 #(#decodes)*
                 Ok(#construct)
             }
 
-            fn encode_payload(&self, out: &mut Vec<u8>) -> EncodeResult {
+            fn encode_payload(&self, out: &mut Vec<u8>) -> ::mc_protocol::encode::Result {
                 #(#encodes)*
                 Ok(())
             }
@@ -146,10 +139,16 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
     })
 }
 
-/// Registers the field helper attribute emitted by `packet`.
-#[proc_macro_derive(Payload, attributes(format))]
-pub fn derive_payload(_input: TokenStream) -> TokenStream {
-    TokenStream::new()
+/// `#[format]` only steers the generated codec; the struct itself must not keep it.
+fn without_format_attributes(item: &DeriveInput) -> DeriveInput {
+    let mut item = item.clone();
+    let Data::Struct(data) = &mut item.data else {
+        return item;
+    };
+    for field in data.fields.iter_mut() {
+        field.attrs.retain(|attr| !attr.path().is_ident("format"));
+    }
+    item
 }
 
 #[proc_macro_derive(InnerPacket)]

@@ -1,16 +1,9 @@
-use crate::VarInt;
 use crate::data::config::*;
-use crate::packets::PacketWriter;
-use crate::packets::Payload;
 use crate::state::HandshakeIntent;
-use crate::state::State;
 use crate::types::KnownPack;
 use crate::types::bytes::Remainder;
 
-use crate::decode::Result as DecodeResult;
-use crate::encode::Result as EncodeResult;
-
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 use uuid::Uuid;
 
 #[packet(Handshake, 0x00, Server)]

@@ -1,10 +1,9 @@
 //! Serverbound gameplay packets for protocol 777.
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 
-use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
-use crate::packets::{PacketWriter, Payload};
+use crate::packets::PacketWriter;
 use crate::types::VarInt;
 
 #[packet(Play, 0x0C, Server)]

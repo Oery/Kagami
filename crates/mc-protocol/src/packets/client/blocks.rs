@@ -1,10 +1,6 @@
 //! Protocol 777 block feedback and supported block-entity synchronization.
-use crate::State;
-use crate::decode::Result as DecodeResult;
-use crate::encode::Result as EncodeResult;
-use crate::packets::{PacketWriter, Payload};
-use crate::types::{Nbt, VarInt};
-use mc_protocol_macros::{Payload, packet};
+use crate::types::Nbt;
+use mc_protocol_macros::packet;
 
 #[packet(Play, 0x05, Client)]
 pub struct SetBlockDestroyStage {

@@ -1,11 +1,10 @@
 //! Command trees with literals, words, numeric arguments and world coordinates.
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 
-use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::error::DecodeError;
-use crate::packets::{PacketWriter, Payload};
+use crate::packets::PacketWriter;
 use crate::types::{Nbt, VarInt};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

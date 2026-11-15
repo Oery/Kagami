@@ -1,3 +1,6 @@
+// Lets generated packet code use `::mc_protocol` paths inside this crate too.
+extern crate self as mc_protocol;
+
 pub mod auth;
 pub mod data;
 pub mod decode;
@@ -7,7 +10,7 @@ pub mod packets;
 pub mod state;
 pub mod types;
 
-pub use crate::packets::PacketWriter;
+pub use crate::packets::{PacketWriter, Payload};
 pub use crate::state::State;
 pub use crate::types::VarInt;
 

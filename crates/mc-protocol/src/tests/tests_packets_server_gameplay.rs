@@ -1,4 +1,5 @@
 use super::*;
+use crate::{Payload, State};
 
 #[test]
 fn flight_requests_dispatch_with_a_single_flags_byte() {

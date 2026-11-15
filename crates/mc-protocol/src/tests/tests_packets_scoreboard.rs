@@ -1,4 +1,5 @@
 use super::*;
+use crate::Payload;
 
 fn body<'p>(packet: &impl Payload<'p>, id: i32) -> Vec<u8> {
     let mut bytes = Vec::new();

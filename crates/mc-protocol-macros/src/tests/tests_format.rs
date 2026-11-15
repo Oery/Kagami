@@ -10,7 +10,7 @@ fn documentation_does_not_hide_a_field_format() {
 fn unknown_duplicate_and_malformed_formats_are_rejected() {
     for attrs in [
         vec![syn::parse_quote!(#[format = "varnit"])],
-        vec![syn::parse_quote!(#[format = "json"]), syn::parse_quote!(#[format = "json"])],
+        vec![syn::parse_quote!(#[format = "varint"]), syn::parse_quote!(#[format = "varint"])],
         vec![syn::parse_quote!(#[format])],
         vec![syn::parse_quote!(#[format = 3])],
         vec![syn::parse_quote!(#[format(json)])],

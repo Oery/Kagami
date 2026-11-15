@@ -1,12 +1,10 @@
 //! Bounded chat inputs. Signatures are consumed without claiming verification.
-use crate::State;
-use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 
 use crate::decode::{read_length, take};
 use crate::error::{DecodeError, EncodeError};
-use crate::packets::{PacketWriter, Payload};
+use crate::packets::PacketWriter;
 use crate::types::VarInt;
 
 #[derive(Debug)]

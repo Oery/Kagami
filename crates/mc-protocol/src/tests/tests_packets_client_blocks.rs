@@ -1,4 +1,5 @@
 use super::*;
+use crate::Payload;
 
 #[test]
 fn block_feedback_uses_protocol_777_field_order_and_lengths() {

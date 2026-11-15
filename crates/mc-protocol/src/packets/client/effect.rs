@@ -1,6 +1,6 @@
 //! Cosmetic protocol 777 feedback: swings, entity animations, sounds and particles.
 
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 
 use crate::State;
 use crate::decode::Result as DecodeResult;

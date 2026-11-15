@@ -1,5 +1,4 @@
 use super::*;
-use mc_protocol_macros::Payload;
 
 #[mc_protocol_macros::packet(Play, 0x7e, Client)]
 struct QualifiedPacket<'wire> {

@@ -1,12 +1,8 @@
 //! Entity spawning, movement and removal for protocol 777.
 
-use mc_protocol_macros::{Payload, packet};
+use mc_protocol_macros::packet;
 use uuid::Uuid;
 
-use crate::State;
-use crate::decode::Result as DecodeResult;
-use crate::encode::Result as EncodeResult;
-use crate::packets::{PacketWriter, Payload};
 use crate::types::{LpVec3, VarInt};
 
 /// `data` is type-specific: falling blocks carry their block state; items and
