@@ -1,10 +1,13 @@
 //! Serverbound gameplay packets for protocol 777.
-use mc_protocol_macros::packet;
+use std::borrow::Cow;
+
+use mc_protocol_macros::{IntoOwned, packet};
 
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
+use crate::error::DecodeError;
 use crate::packets::PacketWriter;
-use crate::types::VarInt;
+use crate::types::{LpVec3, VarInt};
 
 #[packet(Play, 0x0C, Serverbound)]
 pub struct ClientCommand {
@@ -176,6 +179,98 @@ pub struct ClickContainer {
     pub mode: i32,
     pub changed_slots: Vec<ChangedSlot>,
     pub carried: Option<HashedItem>,
+}
+
+/// A right click on an entity. Attacks are [`Attack`](super::Attack).
+#[packet(Play, 0x1A, Serverbound)]
+pub struct Interact {
+    #[format = "varint"]
+    pub entity_id: i32,
+    #[format = "varint"]
+    pub hand: i32,
+    /// The clicked point, relative to the entity's position.
+    pub target_offset: LpVec3,
+    pub sneaking: bool,
+}
+
+/// The client moving the vehicle it controls; degrees.
+#[packet(Play, 0x22, Serverbound)]
+pub struct ClientMoveVehicle {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub yaw: f32,
+    pub pitch: f32,
+    pub on_ground: bool,
+}
+
+#[packet(Play, 0x23, Serverbound)]
+pub struct PaddleBoat {
+    pub left_turning: bool,
+    pub right_turning: bool,
+}
+
+/// A spectator's click: the targeted entity ID plus one, or zero for none.
+#[packet(Play, 0x3F, Serverbound)]
+pub struct SpectatorAction {
+    #[format = "varint"]
+    pub entity_id: i32,
+}
+
+/// The game mode switcher (F3 + F4).
+#[packet(Play, 0x05, Serverbound)]
+pub struct ChangeGameMode {
+    #[format = "varint"]
+    pub game_mode: i32,
+}
+
+/// A [`difficulty`](crate::packets::client::difficulty) value.
+#[packet(Play, 0x04, Serverbound)]
+pub struct ChangeDifficultyRequest {
+    pub difficulty: u8,
+}
+
+#[packet(Play, 0x1D, Serverbound)]
+pub struct LockDifficulty {
+    pub locked: bool,
+}
+
+#[derive(Debug, IntoOwned)]
+pub enum AdvancementsScreenAction<'p> {
+    OpenedTab(Cow<'p, str>),
+    ClosedScreen,
+}
+
+impl<'p> PacketWriter<'p> for AdvancementsScreenAction<'p> {
+    fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
+        match VarInt::read(input)?.0 {
+            0 => Ok(Self::OpenedTab(Cow::read(input)?)),
+            1 => Ok(Self::ClosedScreen),
+            _ => Err(DecodeError::EnumOutOfRange),
+        }
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        match self {
+            Self::OpenedTab(tab) => {
+                VarInt(0).encode(out)?;
+                tab.encode(out)
+            }
+            Self::ClosedScreen => VarInt(1).encode(out),
+        }
+    }
+
+    fn body_len(&self) -> usize {
+        match self {
+            Self::OpenedTab(tab) => 1 + tab.body_len(),
+            Self::ClosedScreen => 1,
+        }
+    }
+}
+
+#[packet(Play, 0x33, Serverbound)]
+pub struct SeenAdvancements<'p> {
+    pub action: AdvancementsScreenAction<'p>,
 }
 
 #[cfg(test)]

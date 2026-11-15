@@ -2,6 +2,7 @@
 use std::borrow::Cow;
 
 use mc_protocol_macros::{IntoOwned, packet};
+use uuid::Uuid;
 
 use crate::decode::{read_length, take};
 use crate::encode::Result as EncodeResult;
@@ -149,6 +150,17 @@ pub struct SignedChatCommand<'p> {
     pub salt: i64,
     pub signatures: ArgumentSignatures<'p>,
     pub seen: LastSeen,
+}
+
+/// The client's chat signing key, sent before its first signed message.
+#[packet(Play, 0x0A, Serverbound)]
+pub struct PlayerSession<'p> {
+    pub session_id: Uuid,
+    /// Milliseconds since the Unix epoch.
+    pub expires_at: i64,
+    /// X.509-encoded.
+    pub public_key: Cow<'p, [u8]>,
+    pub key_signature: Cow<'p, [u8]>,
 }
 
 #[cfg(test)]
