@@ -61,3 +61,31 @@ fn a_drop_skips_the_handlers_after_it() {
     assert_eq!(action, Action::Drop);
     assert_eq!(state, 0);
 }
+
+#[derive(command::Command)]
+struct Ping;
+
+#[test]
+fn a_command_runs_its_handler_and_never_reaches_the_server() {
+    let proxy =
+        Kagami::new(Vec::new()).on_command::<Ping>(|Ping, cx| cx.state.push("pong".to_owned())).on_packet::<ChatCommand>(|command, cx| {
+            cx.state.push(format!("server gets {}", command.command));
+            Action::Forward
+        });
+
+    let interest = interest_of(&proxy);
+    assert!(interest.contains(Direction::Clientbound, State::Play, <Commands as PacketKind>::ID));
+
+    let (action, _, state) = handle_serverbound(proxy, &[0x07, 4, b'p', b'i', b'n', b'g']);
+    assert_eq!(action, Action::Drop);
+    assert_eq!(state, ["pong"]);
+}
+
+#[test]
+fn other_commands_pass_through_a_command_handler() {
+    let proxy = Kagami::new(0).on_command::<Ping>(|Ping, cx| *cx.state += 1);
+
+    let (action, _, state) = handle_serverbound(proxy, &[0x07, 4, b'h', b'o', b'm', b'e']);
+    assert_eq!(action, Action::Forward);
+    assert_eq!(state, 0);
+}

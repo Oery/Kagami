@@ -14,8 +14,9 @@
 use std::io;
 use std::time::Duration;
 
+use kagami::command::Command;
 use kagami::protocol::packets::client::{CommandSuggestionsResponse, SystemChatMessage};
-use kagami::protocol::packets::server::{ChatCommand, CommandSuggestion};
+use kagami::protocol::packets::server::CommandSuggestion;
 use kagami::protocol::types::Nbt;
 use kagami::protocol::types::text::{Style, Text};
 use kagami::{Account, Action, Client, Handlers, Kagami, Session};
@@ -44,27 +45,29 @@ fn main() -> io::Result<()> {
     proxy.run(&listen, &server)
 }
 
+/// Lists the players the server knows.
+#[derive(Command)]
+struct Players;
+
+/// Hides join and leave messages, or shows them again.
+#[derive(Command)]
+struct Joins;
+
 fn players<H: Handlers<()>>(proxy: Kagami<(), H>) -> Kagami<(), impl Handlers<()>> {
     proxy
-        .on_packet::<ChatCommand>(|command, cx| match command.command.as_ref() {
-            "players" => {
-                cx.spawn(list_players(cx.session.clone()));
-                Action::Drop
-            }
-            "joins" => {
-                let hidden = cx.session.is_enabled::<SystemChatMessage>();
+        .on_command::<Players>(|Players, cx| {
+            cx.spawn(list_players(cx.session.clone()));
+        })
+        .on_command::<Joins>(|Joins, cx| {
+            let hidden = cx.session.is_enabled::<SystemChatMessage>();
 
-                if hidden {
-                    cx.session.disable::<SystemChatMessage>();
-                    tell(cx.client, Text::new().plain("Join and leave messages are shown"));
-                } else {
-                    cx.session.enable::<SystemChatMessage>();
-                    tell(cx.client, Text::new().plain("Join and leave messages are hidden"));
-                }
-
-                Action::Drop
+            if hidden {
+                cx.session.disable::<SystemChatMessage>();
+                tell(cx.client, Text::new().plain("Join and leave messages are shown"));
+            } else {
+                cx.session.enable::<SystemChatMessage>();
+                tell(cx.client, Text::new().plain("Join and leave messages are hidden"));
             }
-            _ => Action::Forward,
         })
         .on_packet::<SystemChatMessage>(|message, _| {
             let Some(key) = translation_key(&message.content) else {
