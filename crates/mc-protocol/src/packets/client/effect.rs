@@ -67,12 +67,14 @@ impl<'p> PacketWriter<'p> for InlineSound<'p> {
         if VarInt::read(buf)?.0 != 0 {
             return Err(crate::error::DecodeError::EnumOutOfRange);
         }
+
         Ok(Self { name: Cow::read(buf)?, fixed_range: Option::read(buf)? })
     }
 
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         VarInt(0).encode(out)?;
         self.name.encode(out)?;
+
         self.fixed_range.encode(out)
     }
 
@@ -138,24 +140,29 @@ impl<'p> Payload<'p> for StopSound<'p> {
         if flags & !3 != 0 {
             return Err(crate::error::DecodeError::EnumOutOfRange);
         }
+
         let category = if flags & 1 != 0 {
             Some(VarInt::read(buf)?.0)
         } else {
             None
         };
         let name = if flags & 2 != 0 { Some(Cow::read(buf)?) } else { None };
+
         Ok(Self { category, name })
     }
 
     fn encode_payload(&self, out: &mut Vec<u8>) -> EncodeResult {
         let flags = u8::from(self.category.is_some()) | (u8::from(self.name.is_some()) << 1);
         flags.encode(out)?;
+
         if let Some(category) = self.category {
             VarInt(category).encode(out)?;
         }
+
         if let Some(name) = &self.name {
             name.encode(out)?;
         }
+
         Ok(())
     }
 }
@@ -253,6 +260,7 @@ impl<'p> PacketWriter<'p> for AttributeModifier<'p> {
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         self.id.encode(out)?;
         self.amount.encode(out)?;
+
         self.operation.encode(out)
     }
 
@@ -278,6 +286,7 @@ impl<'p> PacketWriter<'p> for AttributeSnapshot<'p> {
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         VarInt(self.attribute).encode(out)?;
         self.base.encode(out)?;
+
         self.modifiers.encode(out)
     }
 

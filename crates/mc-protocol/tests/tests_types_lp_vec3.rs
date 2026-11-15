@@ -22,11 +22,13 @@ fn vectors_match_official_26_3_codec_and_bound_quantization() {
         let decoded = LpVec3::read(&mut input).unwrap();
         assert!(input.is_empty());
         let scale = values.into_iter().filter(|v| v.is_finite()).map(f64::abs).fold(1.0, f64::max).ceil();
+
         if values.iter().all(|v| v.is_finite()) {
             for (actual, wanted) in decoded.0.into_iter().zip(values) {
                 assert!((actual - wanted).abs() <= scale / 32766.0 + 1e-12);
             }
         }
+
         for length in 0..bytes.len() {
             assert!(LpVec3::read(&mut &bytes[..length]).is_err());
         }

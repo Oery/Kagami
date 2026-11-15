@@ -24,20 +24,25 @@ impl FrameHeader {
     /// Parses the length prefix at the start of `bytes`; `None` until it is complete.
     pub fn parse(bytes: &[u8]) -> io::Result<Option<Self>> {
         let mut body_len = 0;
+
         for (index, &byte) in bytes.iter().take(MAX_HEADER_LEN).enumerate() {
             body_len |= usize::from(byte & 0x7f) << (7 * index);
+
             if byte & 0x80 != 0 {
                 continue;
             }
+
             if body_len > MAX_FRAME_LEN {
                 return Err(invalid_data("frame exceeds the maximum length"));
             }
+
             return Ok(Some(Self { header_len: index + 1, body_len }));
         }
 
         if bytes.len() >= MAX_HEADER_LEN {
             return Err(invalid_data("frame length prefix is longer than three bytes"));
         }
+
         Ok(None)
     }
 
@@ -77,6 +82,7 @@ impl FrameBuffer {
         let Some(header) = FrameHeader::parse(self.pending())? else {
             return Ok(None);
         };
+
         if self.pending().len() < header.frame_len() {
             return Ok(None);
         }
@@ -84,6 +90,7 @@ impl FrameBuffer {
         let body_start = self.start + header.header_len;
         let body = body_start..body_start + header.body_len;
         self.consume(header.frame_len());
+
         Ok(Some(body))
     }
 
@@ -96,6 +103,7 @@ impl FrameBuffer {
         self.make_room()?;
         let read = reader.read(&mut self.bytes[self.end..]).await?;
         self.end += read;
+
         Ok(read > 0)
     }
 
@@ -117,11 +125,13 @@ impl FrameBuffer {
         };
         // Room for the whole frame, and for at least one more byte.
         let needed = frame_len.max(self.end + 1);
+
         if needed > self.bytes.len() {
             // `needed` never exceeds the largest frame, so the cap keeps it.
             let grown = needed.max(self.bytes.len() * 2).min(MAX_HEADER_LEN + MAX_FRAME_LEN);
             self.bytes.resize(grown, 0);
         }
+
         Ok(())
     }
 }

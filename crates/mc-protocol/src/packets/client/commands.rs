@@ -51,12 +51,14 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
         if flags & !0x17 != 0 {
             return Err(DecodeError::EnumOutOfRange);
         }
+
         let children = Vec::<VarInt>::read(input)?;
         let kind = match flags & 3 {
             0 if flags & 0x10 == 0 => CommandNodeKind::Root,
             1 if flags & 0x10 == 0 => CommandNodeKind::Literal(Cow::read(input)?),
             2 => {
                 let name = Cow::read(input)?;
+
                 match VarInt::read(input)?.0 {
                     5 => {
                         let mode = VarInt::read(input)?.0;
@@ -64,12 +66,15 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
                         if mode == 2 && !suggest {
                             return Ok(Self { kind: CommandNodeKind::GreedyText { name }, children, executable: flags & 4 != 0 });
                         }
+
                         if mode != 0 {
                             return Err(DecodeError::EnumOutOfRange);
                         }
+
                         if suggest && <&str>::read(input)? != "minecraft:ask_server" {
                             return Err(DecodeError::EnumOutOfRange);
                         }
+
                         CommandNodeKind::Word { name, suggest }
                     }
                     parser @ 1..=4 => {
@@ -77,6 +82,7 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
                         if flags & 0x10 != 0 || u8::read(input)? != 0 {
                             return Err(DecodeError::EnumOutOfRange);
                         }
+
                         let kind = match parser {
                             1 => CommandNumberKind::Float,
                             2 => CommandNumberKind::Double,
@@ -91,6 +97,7 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
             }
             _ => return Err(DecodeError::EnumOutOfRange),
         };
+
         Ok(Self { kind, children, executable: flags & 4 != 0 })
     }
 
@@ -105,6 +112,7 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
         } | if self.executable { 4 } else { 0 };
         (flags as u8).encode(out)?;
         self.children.encode(out)?;
+
         match &self.kind {
             CommandNodeKind::Root => {}
             CommandNodeKind::Literal(name) => name.encode(out)?,
@@ -112,6 +120,7 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
                 name.encode(out)?;
                 VarInt(5).encode(out)?;
                 VarInt(0).encode(out)?;
+
                 if *suggest {
                     "minecraft:ask_server".encode(out)?;
                 }
@@ -132,6 +141,7 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
                 VarInt(10).encode(out)?;
             }
         }
+
         Ok(())
     }
 
@@ -165,9 +175,11 @@ pub struct CommandMatch<'p> {
 impl<'p> PacketWriter<'p> for CommandMatch<'p> {
     fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
         let text = Cow::read(input)?;
+
         if bool::read(input)? {
             return Err(DecodeError::EnumOutOfRange);
         }
+
         Ok(Self { text })
     }
 

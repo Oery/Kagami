@@ -56,6 +56,7 @@ impl<'p> PacketWriter<'p> for RegistryEntry<'p> {
     fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
         self.id.encode(out)?;
         self.data.is_some().encode(out)?;
+
         if let Some(data) = &self.data {
             data.encode(out)?;
         }

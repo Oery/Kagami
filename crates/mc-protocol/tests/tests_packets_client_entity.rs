@@ -9,6 +9,7 @@ fn frame<P: Payload<'static>>(packet: &P) -> Vec<u8> {
     assert_eq!(input.len(), length);
     assert_eq!(VarInt::read(&mut input).unwrap().0, P::ID.0);
     assert_eq!(input.len(), packet.payload_len().unwrap());
+
     bytes
 }
 
@@ -69,6 +70,7 @@ fn angles_wrap_and_quantize_negative_and_large_degrees() {
     assert_eq!(encode_angle(90.0), 64);
     assert_eq!(encode_angle(-450.0), 192);
     assert_eq!(encode_angle(f32::MAX), 0);
+
     for angle in 0..=u8::MAX {
         assert_eq!(encode_angle(decode_angle(angle)), angle);
     }

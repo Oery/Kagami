@@ -16,6 +16,7 @@ impl<'p> PacketWriter<'p> for VarInt {
             }
 
             value |= ((byte & 0x7f) as u32) << shift;
+
             if byte & 0x80 == 0 {
                 return Ok(VarInt(value as i32));
             }
@@ -33,6 +34,7 @@ impl<'p> PacketWriter<'p> for VarInt {
         }
 
         out.push(value as u8);
+
         Ok(())
     }
 

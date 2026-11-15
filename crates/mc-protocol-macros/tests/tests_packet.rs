@@ -12,6 +12,7 @@ fn invalid_packet_attributes_and_declarations_have_specific_diagnostics() {
         let error = syn::parse2::<PacketAttributes>(attributes).err().unwrap();
         assert!(error.to_string().contains(expected), "{error}");
     }
+
     for (input, expected) in [
         (
             syn::parse_quote!(

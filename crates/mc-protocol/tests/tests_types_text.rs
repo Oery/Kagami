@@ -18,6 +18,7 @@ fn fields<'a>(nbt: &'a Nbt<'a>) -> &'a [(Cow<'a, str>, Nbt<'a>)] {
     let Nbt::Compound(fields) = nbt else {
         panic!("expected a compound")
     };
+
     fields
 }
 

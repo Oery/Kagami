@@ -23,6 +23,7 @@ fn encode<'p>(packet: &impl Payload<'p>) -> Vec<u8> {
     assert_eq!(VarInt::read(&mut input).unwrap().0 as usize, input.len());
     VarInt::read(&mut input).unwrap();
     assert_eq!(packet.payload_len().unwrap(), input.len());
+
     bytes
 }
 
@@ -34,6 +35,7 @@ fn commands_and_completion_requests_dispatch_only_in_play() {
     ] {
         let mut input = packet.as_slice();
         VarInt::read(&mut input).unwrap();
+
         match Serverbound::decode(State::Play, input).unwrap() {
             Serverbound::ChatCommand(p) => assert_eq!(p.command, "gamemode 1"),
             Serverbound::CommandSuggestion(p) => {
@@ -43,6 +45,7 @@ fn commands_and_completion_requests_dispatch_only_in_play() {
             _ => panic!("wrong dispatch"),
         }
     }
+
     assert!(ChatCommand::decode_payload(&mut [8, b'g'].as_slice()).is_err());
     assert!(CommandSuggestion::decode_payload(&mut [42].as_slice()).is_err());
     assert!(matches!(Serverbound::decode(State::Handshake, &[0x07, 0]), Ok(Serverbound::Raw(_))));

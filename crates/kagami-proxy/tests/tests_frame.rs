@@ -18,9 +18,11 @@ impl AsyncRead for Chunks {
         };
         let len = chunk.len().min(buf.len());
         buf[..len].copy_from_slice(&chunk[..len]);
+
         if len < chunk.len() {
             self.0.push_front(chunk.split_off(len));
         }
+
         Poll::Ready(Ok(len))
     }
 }
@@ -63,9 +65,11 @@ fn the_buffer_grows_for_frames_larger_than_it() {
     let mut buffer = FrameBuffer::new();
 
     let mut taken = None;
+
     while taken.is_none() {
         assert!(block_on(buffer.fill(&mut reader)).unwrap());
         taken = buffer.take_frame().unwrap();
     }
+
     assert_eq!(buffer.slice(taken.unwrap()), body);
 }

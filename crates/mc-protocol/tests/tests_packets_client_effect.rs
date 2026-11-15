@@ -5,6 +5,7 @@ fn encode<'p>(packet: &impl Payload<'p>) -> Vec<u8> {
     let mut bytes = Vec::new();
     packet.encode_payload(&mut bytes).unwrap();
     assert_eq!(bytes.len(), packet.payload_len().unwrap());
+
     bytes
 }
 
@@ -56,6 +57,7 @@ fn stop_sound_flags_control_optional_fields_and_frame_lengths() {
         assert_eq!(frame[1], 0x79);
         assert_eq!(&frame[2..], expected);
     }
+
     // Both the identifier and packet length can require multi-byte VarInts.
     let name = format!("a:{}", "b".repeat(128));
     let packet = StopSound { category: Some(7), name: Some((&name).into()) };
@@ -66,6 +68,7 @@ fn stop_sound_flags_control_optional_fields_and_frame_lengths() {
     assert_eq!(VarInt::read(&mut input).unwrap().0, 0x79);
     assert_eq!(StopSound::decode_payload(&mut input).unwrap(), packet);
     assert!(input.is_empty());
+
     for invalid in [&[4][..], &[1][..], &[2][..], &[3, 7][..]] {
         assert!(StopSound::decode_payload(&mut &invalid[..]).is_err());
     }

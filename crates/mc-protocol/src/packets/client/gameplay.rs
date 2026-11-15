@@ -49,10 +49,12 @@ impl<'p> PacketWriter<'p> for DeathLocation<'p> {
     fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
         Ok(Self { dimension: Cow::read(input)?, location: i64::read(input)? })
     }
+
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         self.dimension.encode(out)?;
         self.location.encode(out)
     }
+
     fn body_len(&self) -> usize {
         self.dimension.body_len() + 8
     }
@@ -96,11 +98,14 @@ impl PacketWriter<'_> for DamagePosition {
     fn read(input: &mut &[u8]) -> DecodeResult<Self> {
         Ok(Self { x: f64::read(input)?, y: f64::read(input)?, z: f64::read(input)? })
     }
+
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         self.x.encode(out)?;
         self.y.encode(out)?;
+
         self.z.encode(out)
     }
+
     fn body_len(&self) -> usize {
         24
     }

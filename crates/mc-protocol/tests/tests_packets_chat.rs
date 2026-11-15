@@ -19,9 +19,11 @@ fn chat_decodes_signed_and_unsigned_and_rejects_truncated_metadata() {
         assert_eq!(decoded.message.0, "Hello, 世界!");
         assert_eq!(decoded.signature.is_some(), packet.signature.is_some());
         assert!(input.is_empty());
+
         for length in 0..body.len() {
             assert!(ChatMessage::decode_payload(&mut &body[..length]).is_err());
         }
+
         let mut frame_body = vec![9];
         frame_body.extend_from_slice(&body);
         assert!(matches!(Serverbound::decode(State::Play, &frame_body).unwrap(), Serverbound::ChatMessage(_)));
@@ -56,5 +58,6 @@ fn chat_text_limit_counts_utf16_and_checks_lengths_before_reading() {
         text.as_str().encode(&mut bytes).unwrap();
         assert_eq!(ChatText::read(&mut bytes.as_slice()).is_ok(), valid);
     }
+
     assert!(ChatText::read(&mut [0x81, 0x06].as_slice()).is_err());
 }

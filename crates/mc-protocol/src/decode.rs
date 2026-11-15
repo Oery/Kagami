@@ -12,6 +12,7 @@ pub fn read_length(input: &mut &[u8], limit: usize) -> Result<usize> {
     if length > limit {
         return Err(DecodeError::InvalidLength);
     }
+
     Ok(length)
 }
 

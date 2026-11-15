@@ -104,6 +104,7 @@ impl<'p> PacketWriter<'p> for HashedItem {
         let count = VarInt::read(input)?.0;
         let added = Vec::read(input)?;
         let removed = Vec::read(input)?;
+
         Ok(Self { item_id, count, added, removed })
     }
 
@@ -111,6 +112,7 @@ impl<'p> PacketWriter<'p> for HashedItem {
         VarInt(self.item_id).encode(out)?;
         VarInt(self.count).encode(out)?;
         self.added.encode(out)?;
+
         self.removed.encode(out)
     }
 

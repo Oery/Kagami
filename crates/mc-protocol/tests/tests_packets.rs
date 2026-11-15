@@ -42,12 +42,14 @@ fn packet_macros_preserve_qualified_generic_types_and_declared_names_and_lifetim
 fn body(frame: &[u8]) -> &[u8] {
     let mut input = frame;
     VarInt::read(&mut input).unwrap();
+
     input
 }
 
 fn encode<'p, T: Payload<'p>>(v: &T) -> Vec<u8> {
     let mut buf = Vec::new();
     v.encode(&mut buf).unwrap();
+
     buf
 }
 
@@ -117,6 +119,7 @@ fn packet_kinds_name_packets_without_their_lifetime() {
     fn key<K: PacketKind>() -> (Direction, State, u8) {
         (K::DIRECTION, K::STATE, K::ID)
     }
+
     assert_eq!(key::<ChatCommand>(), (Direction::Serverbound, State::Play, 0x07));
     assert_eq!(key::<StatusPacket>(), (Direction::Clientbound, State::Status, 0x00));
 

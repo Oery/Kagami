@@ -94,11 +94,14 @@ impl<'p> PacketWriter<'p> for ObjectiveAction<'p> {
         if mode == 1 {
             return Ok(Self::Remove);
         }
+
         if mode != 0 && mode != 2 {
             return Err(DecodeError::EnumOutOfRange);
         }
+
         let properties =
             ObjectiveProperties { title: Nbt::read(input)?, render: ScoreRender::read(input)?, number_format: Option::read(input)? };
+
         Ok(if mode == 0 {
             Self::Create(properties)
         } else {
@@ -115,6 +118,7 @@ impl<'p> PacketWriter<'p> for ObjectiveAction<'p> {
         mode.encode(out)?;
         properties.title.encode(out)?;
         properties.render.encode(out)?;
+
         properties.number_format.encode(out)
     }
 

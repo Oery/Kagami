@@ -21,6 +21,7 @@ use crate::split::{ReadHalf, WriteHalf};
 /// Serves one client connection until either side closes it.
 pub async fn serve(client: TcpStream, upstream: &Upstream) -> io::Result<()> {
     let mut client = Connection::new(client)?;
+
     let Some(Serverbound::ServerListPing(handshake)) = client.read_serverbound(State::Handshake).await? else {
         return Err(invalid_data("expected a handshake"));
     };
@@ -29,6 +30,7 @@ pub async fn serve(client: TcpStream, upstream: &Upstream) -> io::Result<()> {
 
     let server = TcpStream::connect((upstream.host.as_str(), upstream.port)).await?;
     let mut server = Connection::new(server)?;
+
     // The server sees the address it is reached at, not the proxy's.
     let handshake = ServerListPing { version, addr: upstream.host.as_str().into(), port: upstream.port, next_state: intent };
     server.send(|out| handshake.encode(out)).await?;
@@ -39,6 +41,7 @@ pub async fn serve(client: TcpStream, upstream: &Upstream) -> io::Result<()> {
             if !login(&mut client, &mut server).await? {
                 return Ok(());
             }
+
             pump_both(client, server).await
         }
     }
@@ -51,6 +54,7 @@ async fn relay_status(client: &mut Connection, server: &mut Connection) -> io::R
             break;
         }
     }
+
     Ok(())
 }
 
@@ -66,6 +70,7 @@ async fn login(client: &mut Connection, server: &mut Connection) -> io::Result<b
         let Some(packet) = server.read_clientbound(State::Login).await? else {
             return Ok(false);
         };
+
         match packet {
             Clientbound::LoginSuccess(_) => {
                 client.send(|out| packet.encode(out)).await?;
@@ -78,6 +83,7 @@ async fn login(client: &mut Connection, server: &mut Connection) -> io::Result<b
             // The client answers each request with exactly one response.
             Clientbound::LoginPluginRequest(_) | Clientbound::LoginCookieRequest(_) => {
                 client.send(|out| packet.encode(out)).await?;
+
                 if !forward_serverbound(client, server, State::Login).await? {
                     return Ok(false);
                 }
@@ -97,6 +103,7 @@ async fn login(client: &mut Connection, server: &mut Connection) -> io::Result<b
         return Err(invalid_data("expected login acknowledgement"));
     };
     server.send(|out| acknowledge.encode(out)).await?;
+
     Ok(true)
 }
 
@@ -105,6 +112,7 @@ async fn refuse(client: &mut Connection, reason: &str) -> io::Result<bool> {
     let json = format!(r#"{{"text":"{reason}"}}"#);
     let disconnect = LoginDisconnect { reason: json.into() };
     client.send(|out| disconnect.encode(out)).await?;
+
     Err(io::Error::other(reason.to_owned()))
 }
 
@@ -114,6 +122,7 @@ async fn forward_serverbound(client: &mut Connection, server: &mut Connection, s
         return Ok(false);
     };
     server.send(|out| packet.encode(out)).await?;
+
     Ok(true)
 }
 
@@ -123,6 +132,7 @@ async fn forward_clientbound(server: &mut Connection, client: &mut Connection, s
         return Ok(false);
     };
     client.send(|out| packet.encode(out)).await?;
+
     Ok(true)
 }
 
@@ -134,6 +144,7 @@ async fn pump_both(client: Connection, server: Connection) -> io::Result<()> {
     let to_server = pump_until_closed(Direction::Serverbound, client_buffer, client_reader, server_writer);
     let to_client = pump_until_closed(Direction::Clientbound, server_buffer, server_reader, client_writer);
     let (to_server, to_client) = zip(to_server, to_client).await;
+
     to_server.and(to_client)
 }
 
@@ -144,5 +155,6 @@ async fn pump_until_closed(direction: Direction, mut buffer: FrameBuffer, mut re
     let pumped = pump(direction, State::Config, &mut buffer, &mut reader, &mut writer).await;
     // The peer may already be gone; the pump's own result is what matters.
     let _ = writer.shutdown().await;
+
     pumped
 }

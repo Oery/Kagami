@@ -17,12 +17,14 @@ impl<'p> PacketWriter<'p> for Heightmap {
     fn read(buf: &mut &'p [u8]) -> DecodeResult<Self> {
         let kind = u8::read(buf)?;
         let data = <Vec<i64>>::read(buf)?;
+
         Ok(Self { kind, data })
     }
 
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         self.kind.encode(out)?;
         self.data.encode(out)?;
+
         Ok(())
     }
 
@@ -45,6 +47,7 @@ impl<'p> PacketWriter<'p> for BlockEntity<'p> {
         let y = i16::read(buf)?;
         let kind = VarInt::read(buf)?.0;
         let data = Nbt::read(buf)?;
+
         Ok(Self { packed_xz, y, kind, data })
     }
 
@@ -53,6 +56,7 @@ impl<'p> PacketWriter<'p> for BlockEntity<'p> {
         self.y.encode(out)?;
         VarInt(self.kind).encode(out)?;
         self.data.encode(out)?;
+
         Ok(())
     }
 
@@ -87,6 +91,7 @@ impl LightData<'_> {
         let full: &'static [u8] = &FULL_MASK;
         let empty: &'static [u8] = &EMPTY_MASK;
         let section: &'static [u8] = &FULLBRIGHT_SECTION;
+
         LightData {
             sky_mask: Cow::Borrowed(full),
             block_mask: Cow::Borrowed(full),
@@ -106,6 +111,7 @@ impl<'p> PacketWriter<'p> for LightData<'p> {
         let empty_block_mask = Cow::read(buf)?;
         let sky_light = Vec::read(buf)?;
         let block_light = Vec::read(buf)?;
+
         Ok(Self { sky_mask, block_mask, empty_sky_mask, empty_block_mask, sky_light, block_light })
     }
 
@@ -116,6 +122,7 @@ impl<'p> PacketWriter<'p> for LightData<'p> {
         self.empty_block_mask.encode(out)?;
         self.sky_light.encode(out)?;
         self.block_light.encode(out)?;
+
         Ok(())
     }
 

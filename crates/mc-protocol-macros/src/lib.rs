@@ -35,6 +35,7 @@ fn codec_generics(generics: &Generics) -> syn::Result<(Generics, Lifetime)> {
             "packets support at most one lifetime and no type or const parameters",
         ));
     }
+
     let mut implementation = generics.clone();
     let lifetime = match generics.lifetimes().next() {
         Some(param) => param.lifetime.clone(),
@@ -43,6 +44,7 @@ fn codec_generics(generics: &Generics) -> syn::Result<(Generics, Lifetime)> {
             syn::parse_quote!('p)
         }
     };
+
     Ok((implementation, lifetime))
 }
 
@@ -50,6 +52,7 @@ fn codec_generics(generics: &Generics) -> syn::Result<(Generics, Lifetime)> {
 pub fn packet(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attributes = parse_macro_input!(attr as PacketAttributes);
     let item = parse_macro_input!(input as DeriveInput);
+
     expand_packet(attributes, &item).unwrap_or_else(syn::Error::into_compile_error).into()
 }
 
@@ -85,6 +88,7 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
     let mut decodes = Vec::new();
     let mut encodes = Vec::new();
     let mut lengths = Vec::new();
+
     for field in &fields {
         let ident = &field.ident;
         let ty = &field.ty;
@@ -158,9 +162,11 @@ fn without_format_attributes(item: &DeriveInput) -> DeriveInput {
     let Data::Struct(data) = &mut item.data else {
         return item;
     };
+
     for field in data.fields.iter_mut() {
         field.attrs.retain(|attr| !attr.path().is_ident("format"));
     }
+
     item
 }
 
@@ -178,6 +184,7 @@ pub fn derive_into_owned(input: TokenStream) -> TokenStream {
 pub fn packet_enum(attr: TokenStream, input: TokenStream) -> TokenStream {
     let direction = parse_macro_input!(attr as syn::Ident);
     let item = parse_macro_input!(input as syn::ItemEnum);
+
     expand_packet_enum(direction, &item).unwrap_or_else(syn::Error::into_compile_error).into()
 }
 

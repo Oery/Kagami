@@ -19,20 +19,25 @@ pub fn expand_packet_enum(direction: Ident, item: &ItemEnum) -> syn::Result<Toke
     if direction != "Serverbound" && direction != "Clientbound" {
         return Err(syn::Error::new_spanned(direction, "expected Serverbound or Clientbound"));
     }
+
     let lifetimes: Vec<_> = item.generics.lifetimes().collect();
     if lifetimes.len() != 1 || item.generics.params.len() != 1 {
         return Err(syn::Error::new_spanned(&item.generics, "packet enums take exactly one lifetime"));
     }
+
     let lifetime = &lifetimes[0].lifetime;
 
     let mut variants = Vec::new();
+
     for variant in &item.variants {
         let Fields::Unnamed(fields) = &variant.fields else {
             return Err(syn::Error::new_spanned(variant, "variants hold exactly one packet"));
         };
+
         if fields.unnamed.len() != 1 {
             return Err(syn::Error::new_spanned(variant, "variants hold exactly one packet"));
         }
+
         let ty = &fields.unnamed[0].ty;
         let mut kind = ty.clone();
         StaticLifetime { replaced: lifetime }.visit_type_mut(&mut kind);
@@ -66,14 +71,17 @@ fn expand_uniqueness_check(item: &ItemEnum, variants: &[Variant]) -> Tokens {
         const _: () = {
             let keys: [(u8, u8); #count] = [#(#keys),*];
             let mut first = 0;
+
             while first < keys.len() {
                 let mut second = first + 1;
+
                 while second < keys.len() {
                     let same_state = keys[first].0 == keys[second].0;
                     let same_id = keys[first].1 == keys[second].1;
                     assert!(!(same_state && same_id), #message);
                     second += 1;
                 }
+
                 first += 1;
             }
         };
@@ -83,6 +91,7 @@ fn expand_uniqueness_check(item: &ItemEnum, variants: &[Variant]) -> Tokens {
 fn expand_definition(item: &ItemEnum, lifetime: &Lifetime, variants: &[Variant]) -> Tokens {
     let ItemEnum { attrs, vis, ident, generics, .. } = item;
     let declarations = variants.iter().map(|Variant { name, attrs, ty, .. }| quote!(#(#attrs)* #name(#ty)));
+
     quote! {
         #(#attrs)*
         #[derive(Debug)]
@@ -127,6 +136,7 @@ fn expand_methods(item: &ItemEnum, lifetime: &Lifetime, variants: &[Variant]) ->
                 if !input.is_empty() {
                     return Err(::mc_protocol::error::DecodeError::TrailingData);
                 }
+
                 Ok(packet)
             }
 

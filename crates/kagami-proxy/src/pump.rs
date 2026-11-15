@@ -18,6 +18,7 @@ where
 {
     loop {
         let complete = scan(direction, &mut state, buffer.pending())?;
+
         if complete > 0 {
             writer.write_all(&buffer.pending()[..complete]).await?;
             buffer.consume(complete);
@@ -33,6 +34,7 @@ where
 /// follows the state changes they cause.
 fn scan(direction: Direction, state: &mut State, bytes: &[u8]) -> io::Result<usize> {
     let mut offset = 0;
+
     while let Some(header) = FrameHeader::parse(&bytes[offset..])? {
         let frame_end = offset + header.frame_len();
         if frame_end > bytes.len() {
@@ -41,12 +43,15 @@ fn scan(direction: Direction, state: &mut State, bytes: &[u8]) -> io::Result<usi
 
         let mut body = &bytes[offset + header.header_len..frame_end];
         let id = VarInt::read(&mut body).map_err(invalid_data)?.0;
+
         // Ids past a byte belong to no known packet, so they never change state.
         if let Ok(id) = u8::try_from(id) {
             *state = next_state(direction, *state, id);
         }
+
         offset = frame_end;
     }
+
     Ok(offset)
 }
 

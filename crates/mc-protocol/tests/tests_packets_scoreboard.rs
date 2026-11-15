@@ -8,6 +8,7 @@ fn body<'p>(packet: &impl Payload<'p>, id: i32) -> Vec<u8> {
     assert_eq!(VarInt::read(&mut input).unwrap().0 as usize, input.len());
     assert_eq!(VarInt::read(&mut input).unwrap().0, id);
     assert_eq!(packet.payload_len().unwrap(), input.len());
+
     input.to_vec()
 }
 
@@ -31,6 +32,7 @@ fn objective_modes_and_number_formats_have_exact_conditional_fields() {
         ),
         (ScoreNumberFormat::Fixed(Nbt::Str("x".into())), vec![2, 8, 0, 1, b'x']),
     ];
+
     for (format, expected) in formats {
         let packet = SetObjective {
             name: "o".into(),
@@ -64,6 +66,7 @@ fn display_slots_and_clear_use_varint_and_empty_name() {
         assert_eq!(body(&SetDisplayObjective { slot, name: "o".into() }, 0x64), [slot as u8, 1, b'o']);
         assert_eq!(body(&SetDisplayObjective { slot, name: "".into() }, 0x64), [slot as u8, 0]);
     }
+
     assert!(ScoreRender::read(&mut [2].as_slice()).is_err());
     assert!(ObjectiveAction::read(&mut [3].as_slice()).is_err());
     assert!(ScoreNumberFormat::read(&mut [3].as_slice()).is_err());

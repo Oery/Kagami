@@ -58,6 +58,7 @@ impl<'p> PacketWriter<'p> for TeamAction<'p> {
         VarInt(properties.collision_rule).encode(out)?;
         properties.color.encode(out)?;
         properties.friendly_flags.encode(out)?;
+
         properties.entities.encode(out)
     }
 

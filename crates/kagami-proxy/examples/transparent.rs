@@ -12,5 +12,6 @@ fn main() -> io::Result<()> {
         std::process::exit(2);
     };
     let listen: SocketAddr = listen.parse().map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid listen address"))?;
+
     kagami_proxy::run(listen, &server)
 }

@@ -61,6 +61,7 @@ fn main() {
     let executor = LocalExecutorBuilder::default().name("bench-client").make().unwrap();
     executor.run(async move {
         println!("{:<24}{:>14}{:>14}", "", "direct", "proxied");
+
         for body_len in [16 * 1024, 64] {
             let label = format!("throughput {body_len} B");
             let direct = throughput(server, body_len).await;
@@ -70,6 +71,7 @@ fn main() {
 
         let direct = latencies(server).await;
         let proxied = latencies(proxy).await;
+
         for (label, quantile) in [("latency p50", 0.50), ("latency p99", 0.99), ("latency p99.9", 0.999)] {
             let direct = percentile(&direct, quantile);
             let proxied = percentile(&proxied, quantile);
@@ -85,11 +87,13 @@ async fn throughput(address: SocketAddr, body_len: usize) -> f64 {
     let started = Instant::now();
 
     let mut received = 0;
+
     while received < streamed_frame_count(body_len) * bulk_frame(body_len).len() {
         let read = stream.read(&mut buffer).await.unwrap();
         assert!(read > 0, "server closed the stream early");
         received += read;
     }
+
     received as f64 / started.elapsed().as_secs_f64() / (1u64 << 30) as f64
 }
 
@@ -100,13 +104,16 @@ async fn latencies(address: SocketAddr) -> Vec<Duration> {
     let mut response = vec![0; request.len()];
 
     let mut samples = Vec::with_capacity(ROUND_TRIPS);
+
     for _ in 0..ROUND_TRIPS {
         let started = Instant::now();
         stream.write_all(&request).await.unwrap();
         stream.read_exact(&mut response).await.unwrap();
         samples.push(started.elapsed());
     }
+
     samples.sort();
+
     samples
 }
 
@@ -126,6 +133,7 @@ async fn join(address: SocketAddr, scenario: Scenario) -> TcpStream {
     let body = read_body(&mut stream).await;
     assert!(matches!(Clientbound::decode(State::Config, &body).unwrap(), Clientbound::FinishConfiguration(_)));
     send(&mut stream, &AcknowledgeFinish).await;
+
     stream
 }
 
@@ -135,8 +143,10 @@ async fn connect(address: SocketAddr) -> TcpStream {
         if let Ok(stream) = TcpStream::connect(address).await {
             return stream;
         }
+
         glommio::timer::sleep(Duration::from_millis(10)).await;
     }
+
     panic!("nothing listens on {address}");
 }
 
@@ -172,6 +182,7 @@ async fn serve(mut stream: TcpStream) {
             let frames_per_batch = (WRITE_BATCH / frame.len()).max(1);
             let batch = frame.repeat(frames_per_batch);
             let mut remaining = streamed_frame_count(body_len);
+
             while remaining > 0 {
                 let frames = remaining.min(frames_per_batch);
                 stream.write_all(&batch[..frames * frame.len()]).await.unwrap();
@@ -181,6 +192,7 @@ async fn serve(mut stream: TcpStream) {
         Scenario::Echo => {
             let mut request = echo_frame(ECHO_REQUEST_ID);
             let response = echo_frame(ECHO_RESPONSE_ID);
+
             while stream.read_exact(&mut request).await.is_ok() {
                 stream.write_all(&response).await.unwrap();
             }
@@ -204,6 +216,7 @@ fn echo_frame(id: i32) -> Vec<u8> {
 fn raw_frame(id: i32, payload: Vec<u8>) -> Vec<u8> {
     let mut frame = Vec::new();
     RawPacket { id, payload: payload.into() }.encode(&mut frame).unwrap();
+
     frame
 }
 
@@ -216,17 +229,21 @@ async fn send<'p>(stream: &mut TcpStream, packet: &impl Payload<'p>) {
 /// Reads one frame and returns its body. Only used while logging in.
 async fn read_body(stream: &mut TcpStream) -> Vec<u8> {
     let mut prefix = Vec::new();
+
     loop {
         let mut byte = [0];
         stream.read_exact(&mut byte).await.unwrap();
         prefix.push(byte[0]);
+
         if byte[0] & 0x80 == 0 {
             break;
         }
     }
+
     let body_len = VarInt::read(&mut prefix.as_slice()).unwrap().0 as usize;
     let mut body = vec![0; body_len];
     stream.read_exact(&mut body).await.unwrap();
+
     body
 }
 
@@ -237,6 +254,7 @@ fn start_on_thread<F: Future<Output = ()> + 'static>(name: &'static str, serve: 
         let executor = LocalExecutorBuilder::default().name(name).make().unwrap();
         executor.run(async move { serve(TcpListener::bind(address).unwrap()).await });
     });
+
     address
 }
 

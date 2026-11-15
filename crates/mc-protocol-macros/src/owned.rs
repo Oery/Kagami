@@ -7,6 +7,7 @@ use syn::{Data, DeriveInput, Fields, Ident, Lifetime};
 pub fn expand_into_owned(item: &DeriveInput) -> syn::Result<Tokens> {
     let generics = &item.generics;
     let has_type_parameters = generics.params.iter().any(|param| !matches!(param, syn::GenericParam::Lifetime(_)));
+
     if has_type_parameters || generics.lifetimes().count() > 1 {
         return Err(syn::Error::new_spanned(
             generics,
@@ -16,6 +17,7 @@ pub fn expand_into_owned(item: &DeriveInput) -> syn::Result<Tokens> {
 
     let name = &item.ident;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     if generics.lifetimes().next().is_none() {
         return Ok(quote! {
             impl ::mc_protocol::IntoOwned for #name #where_clause {
@@ -35,17 +37,20 @@ pub fn expand_into_owned(item: &DeriveInput) -> syn::Result<Tokens> {
         }
         Data::Enum(data) => {
             let mut arms = Vec::new();
+
             for variant in &data.variants {
                 let variant_name = &variant.ident;
                 let (pattern, construct) = convert_fields(quote!(#name::#variant_name), &variant.fields);
                 arms.push(quote!(#pattern => #construct));
             }
+
             quote!(match self { #(#arms),* })
         }
         Data::Union(_) => return Err(syn::Error::new_spanned(item, "IntoOwned does not support unions")),
     };
 
     let owned_lifetime = Lifetime::new("'static", Span::call_site());
+
     Ok(quote! {
         impl #impl_generics ::mc_protocol::IntoOwned for #name #ty_generics #where_clause {
             type Owned = #name<#owned_lifetime>;

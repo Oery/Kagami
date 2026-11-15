@@ -100,9 +100,11 @@ impl Style {
             ("strikethrough".into(), Nbt::Bool(self.strikethrough)),
             ("obfuscated".into(), Nbt::Bool(self.obfuscated)),
         ];
+
         if let Some(color) = self.color {
             fields.push(("color".into(), Nbt::Str(color.into())));
         }
+
         Nbt::Compound(fields)
     }
 
@@ -113,6 +115,7 @@ impl Style {
         {
             return Err(InvalidText);
         }
+
         Ok(())
     }
 }
@@ -179,6 +182,7 @@ impl Text {
         if self.0.is_empty() {
             return Nbt::Compound(vec![("text".into(), Nbt::Str("".into()))]);
         }
+
         let extra = self
             .0
             .iter()
@@ -190,6 +194,7 @@ impl Text {
                 Nbt::Compound(fields)
             })
             .collect();
+
         Nbt::Compound(vec![("text".into(), Nbt::Str("".into())), ("extra".into(), Nbt::List(extra))])
     }
 
@@ -198,12 +203,15 @@ impl Text {
         if self.0.len() > MAX_SPANS || self.0.iter().map(|s| s.text.len()).sum::<usize>() > MAX_TEXT_BYTES {
             return Err(InvalidText);
         }
+
         for span in &self.0 {
             span.style.validate()?;
         }
+
         if self.nbt().body_len() > MAX_TEXT_BYTES {
             return Err(InvalidText);
         }
+
         Ok(())
     }
 }

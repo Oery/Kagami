@@ -31,6 +31,7 @@ impl Connection {
             if let Some(body) = self.buffer.take_frame()? {
                 return Ok(Some(self.buffer.slice(body)));
             }
+
             if !self.buffer.fill(&mut self.stream).await? {
                 return Ok(None);
             }
@@ -42,6 +43,7 @@ impl Connection {
             return Ok(None);
         };
         let packet = Serverbound::decode(state, body).map_err(invalid_data)?;
+
         Ok(Some(packet))
     }
 
@@ -50,6 +52,7 @@ impl Connection {
             return Ok(None);
         };
         let packet = Clientbound::decode(state, body).map_err(invalid_data)?;
+
         Ok(Some(packet))
     }
 
@@ -57,6 +60,7 @@ impl Connection {
     pub async fn send(&mut self, encode: impl FnOnce(&mut Vec<u8>) -> mc_protocol::encode::Result) -> io::Result<()> {
         self.outgoing.clear();
         encode(&mut self.outgoing).map_err(invalid_data)?;
+
         self.stream.write_all(&self.outgoing).await
     }
 

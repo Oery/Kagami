@@ -13,6 +13,7 @@ impl<'p> PacketWriter<'p> for &'p str {
         if str.encode_utf16().count() > 32_767 {
             return Err(DecodeError::InvalidLength);
         }
+
         Ok(str)
     }
 

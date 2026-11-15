@@ -11,9 +11,11 @@ impl Format {
         let Some(attr) = formats.next() else {
             return Ok(Self::Standard);
         };
+
         if let Some(duplicate) = formats.next() {
             return Err(syn::Error::new_spanned(duplicate, "duplicate field format"));
         }
+
         if let Meta::NameValue(value) = &attr.meta
             && let Expr::Lit(ExprLit { lit: Lit::Str(name), .. }) = &value.value
         {
@@ -22,6 +24,7 @@ impl Format {
                 _ => Err(syn::Error::new_spanned(name, "expected varint")),
             };
         }
+
         Err(syn::Error::new_spanned(attr, "expected #[format = \"varint\"]"))
     }
 }

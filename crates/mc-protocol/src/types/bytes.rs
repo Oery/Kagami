@@ -11,6 +11,7 @@ impl<'p> PacketWriter<'p> for &'p [u8] {
     fn read(input: &mut &'p [u8]) -> Result<&'p [u8], DecodeError> {
         let len = read_length(input, MAX_FRAME_LEN)?;
         let bytes = take(input, len)?;
+
         Ok(bytes)
     }
 

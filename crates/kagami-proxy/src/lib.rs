@@ -44,6 +44,7 @@ impl Upstream {
             Some(port) => port.parse().map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid server port"))?,
             None => DEFAULT_PORT,
         };
+
         Ok(Self { host: host.to_owned(), port })
     }
 }
@@ -53,11 +54,13 @@ impl Upstream {
 pub fn run(listen: SocketAddr, server: &str) -> io::Result<()> {
     let upstream = Upstream::parse(server)?;
     let executor = LocalExecutorBuilder::default().name("kagami").make()?;
+
     executor.run(accept_forever(listen, upstream))
 }
 
 async fn accept_forever(listen: SocketAddr, upstream: Upstream) -> io::Result<()> {
     let listener = TcpListener::bind(listen)?;
+
     loop {
         let client = listener.accept().await?;
         let upstream = upstream.clone();

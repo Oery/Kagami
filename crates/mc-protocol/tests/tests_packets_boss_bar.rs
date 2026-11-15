@@ -8,6 +8,7 @@ fn check(action: BossBarAction<'_>, expected: &[u8]) {
     assert_eq!(packet.payload_len().unwrap(), bytes.len());
     assert_eq!(&bytes[..16], &[0x42; 16]);
     assert_eq!(&bytes[16..], expected);
+
     // NBT is encode-only in this server. Other operations round-trip as well.
     if !matches!(packet.action, BossBarAction::Add { .. } | BossBarAction::Title(_)) {
         let mut input = bytes.as_slice();
@@ -17,6 +18,7 @@ fn check(action: BossBarAction<'_>, expected: &[u8]) {
         decoded.encode_payload(&mut roundtrip).unwrap();
         assert_eq!(bytes, roundtrip);
     }
+
     let mut framed = Vec::new();
     packet.encode(&mut framed).unwrap();
     let mut input = framed.as_slice();
@@ -42,6 +44,7 @@ fn boss_bar_operations_have_vanilla_field_order_and_lengths() {
     check(BossBarAction::Progress(1.0), &[2, 0x3f, 0x80, 0, 0]);
     check(BossBarAction::Title(Nbt::Str("Hi".into())), &[3, 8, 0, 2, b'H', b'i']);
     check(BossBarAction::Style { color: BossBarColor::Red, overlay: BossBarOverlay::Notched6 }, &[4, 2, 1]);
+
     for flags in 0..8 {
         check(BossBarAction::Flags(flags), &[5, flags]);
     }
@@ -52,6 +55,7 @@ fn boss_bar_enums_reject_unknown_values() {
     assert!(BossBarAction::read(&mut &[6][..]).is_err());
     assert!(BossBarColor::read(&mut &[7][..]).is_err());
     assert!(BossBarOverlay::read(&mut &[5][..]).is_err());
+
     for (value, expected) in [
         BossBarColor::Pink,
         BossBarColor::Blue,
@@ -66,6 +70,7 @@ fn boss_bar_enums_reject_unknown_values() {
     {
         assert_eq!(BossBarColor::read(&mut &[value as u8][..]).unwrap(), expected);
     }
+
     for (value, expected) in [
         BossBarOverlay::Continuous,
         BossBarOverlay::Notched6,

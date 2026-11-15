@@ -17,5 +17,6 @@ fn unknown_duplicate_and_malformed_formats_are_rejected() {
     ] {
         assert!(Format::parse(&attrs).is_err());
     }
+
     assert!(matches!(Format::parse(&[]).unwrap(), Format::Standard));
 }

@@ -46,6 +46,7 @@ pub trait Payload<'p>: Sized {
         let length = i32::try_from(length).map_err(|_| EncodeError::InvalidLength)?;
         VarInt(length).encode(out)?;
         Self::ID.encode(out)?;
+
         self.encode_payload(out)
     }
 
@@ -56,6 +57,7 @@ pub trait Payload<'p>: Sized {
         let mut frame = Vec::new();
         self.encode(&mut frame)?;
         w.write_all(&frame).await?;
+
         Ok(())
     }
 }
@@ -96,6 +98,7 @@ impl RawPacket<'_> {
         VarInt(length).encode(out)?;
         id.encode(out)?;
         out.extend_from_slice(&self.payload);
+
         Ok(())
     }
 }

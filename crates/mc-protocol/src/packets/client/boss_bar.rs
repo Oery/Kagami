@@ -57,6 +57,7 @@ impl<'p> PacketWriter<'p> for BossBarAction<'p> {
             _ => return Err(DecodeError::EnumOutOfRange),
         })
     }
+
     fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         match self {
             Self::Add { title, progress, color, overlay, flags } => {
@@ -87,6 +88,7 @@ impl<'p> PacketWriter<'p> for BossBarAction<'p> {
             }
         }
     }
+
     fn body_len(&self) -> usize {
         1 + match self {
             Self::Add { title, .. } => title.body_len() + 7,
