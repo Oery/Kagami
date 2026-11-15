@@ -2,12 +2,13 @@
 
 use std::io;
 
-use futures_lite::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use futures_lite::{AsyncRead, AsyncWrite};
 use mc_protocol::{Direction, PacketWriter, State, VarInt};
 
 use crate::compression::Inflater;
 use crate::frame::{FrameBuffer, FrameHeader};
 use crate::invalid_data;
+use crate::stream::Writer;
 use crate::transition::next_state;
 
 /// What a pump needs to know about the frames it forwards.
@@ -20,7 +21,7 @@ pub struct Wire {
 /// Copies frames from `reader` to `writer` until `reader` ends. Complete
 /// frames are written straight from the read buffer, in runs, and are
 /// never inflated: compression is mirrored on both legs.
-pub async fn pump<R, W>(wire: Wire, mut state: State, buffer: &mut FrameBuffer, reader: &mut R, writer: &mut W) -> io::Result<()>
+pub async fn pump<R, W>(wire: Wire, mut state: State, buffer: &mut FrameBuffer, reader: &mut R, writer: &mut Writer<W>) -> io::Result<()>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -31,7 +32,7 @@ where
         let complete = scan(wire.direction, &mut state, inflater.as_mut(), buffer.pending())?;
 
         if complete > 0 {
-            writer.write_all(&buffer.pending()[..complete]).await?;
+            writer.write_all_in_place(&mut buffer.pending_mut()[..complete]).await?;
             buffer.consume(complete);
         }
 

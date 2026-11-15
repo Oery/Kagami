@@ -6,6 +6,7 @@ use flate2::write::ZlibEncoder;
 use futures_lite::future::block_on;
 
 use super::*;
+use crate::cipher::ciphers;
 use crate::frame::tests::Chunks;
 
 const CLIENTBOUND: Wire = Wire { direction: Direction::Clientbound, compressed: false };
@@ -44,6 +45,25 @@ fn frames_are_forwarded_unchanged_however_they_arrive() {
     let mut written = Vec::new();
     let mut buffer = FrameBuffer::new();
 
-    block_on(pump(CLIENTBOUND, State::Config, &mut buffer, &mut reader, &mut written)).unwrap();
+    block_on(pump(CLIENTBOUND, State::Config, &mut buffer, &mut reader, &mut Writer::new(&mut written))).unwrap();
+    assert_eq!(written, frames);
+}
+
+#[test]
+fn encryption_continues_across_writes() {
+    let frames = [1, 0x03, 3, 0x2d, 0xaa, 0xbb, 2, 0x78, 0x00];
+    let chunks = VecDeque::from([frames[..4].to_vec(), frames[4..].to_vec()]);
+    let mut reader = Chunks(chunks);
+    let mut written = Vec::new();
+    let mut buffer = FrameBuffer::new();
+
+    let secret = [9; 16];
+    let (encryptor, mut decryptor) = ciphers(&secret);
+    let mut writer = Writer::new(&mut written);
+    writer.enable_encryption(encryptor);
+    block_on(pump(CLIENTBOUND, State::Config, &mut buffer, &mut reader, &mut writer)).unwrap();
+
+    assert_ne!(written, frames);
+    decryptor.decrypt(&mut written);
     assert_eq!(written, frames);
 }

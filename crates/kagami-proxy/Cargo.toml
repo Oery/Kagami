@@ -7,12 +7,17 @@ license.workspace = true
 autotests = false
 
 [dependencies]
+aes = "0.9.4"
+cfb8 = "0.9.1"
 flate2 = { version = "1.1.11", default-features = false, features = ["zlib-rs"] }
 futures-lite = "2.6.1"
 glommio = { package = "glommio-ng", version = "0.12" }
 mc_protocol = { path = "../mc-protocol" }
-
-[dev-dependencies]
+rand = "0.10.3"
+rsa = { version = "0.10.0", features = ["pkcs1v15"] }
+serde_json = "1.0.154"
+sha1 = "0.11.0"
+ureq = { version = "3.5.2", default-features = false, features = ["rustls", "json"] }
 uuid = "1.26.1"
 
 [[bench]]

@@ -4,19 +4,20 @@
 use std::io;
 use std::ops::Range;
 
-use futures_lite::AsyncWriteExt;
 use glommio::net::TcpStream;
 use mc_protocol::State;
 use mc_protocol::packets::{Clientbound, Serverbound};
 
+use crate::cipher::ciphers;
 use crate::compression::{Inflater, add_zero_data_length};
 use crate::frame::FrameBuffer;
 use crate::invalid_data;
 use crate::split::{ReadHalf, WriteHalf, split};
+use crate::stream::{Reader, Writer};
 
 pub struct Connection {
-    reader: ReadHalf,
-    writer: WriteHalf,
+    reader: Reader<ReadHalf>,
+    writer: Writer<WriteHalf>,
     buffer: FrameBuffer,
     /// Set once the server enabled compression for this leg.
     compression: Option<Inflater>,
@@ -28,8 +29,8 @@ pub struct Connection {
 
 /// A connection handed to the pumps once login is over.
 pub struct Parts {
-    pub reader: ReadHalf,
-    pub writer: WriteHalf,
+    pub reader: Reader<ReadHalf>,
+    pub writer: Writer<WriteHalf>,
     /// Bytes already read but not consumed: the peer may have sent its first
     /// packets of the next state together with its last login packet.
     pub buffer: FrameBuffer,
@@ -41,12 +42,34 @@ impl Connection {
         stream.set_nodelay(true)?;
         let (reader, writer) = split(stream);
 
-        Ok(Self { reader, writer, buffer: FrameBuffer::new(), compression: None, inflated: Vec::new(), outgoing: Vec::new() })
+        Ok(Self {
+            reader: Reader::new(reader),
+            writer: Writer::new(writer),
+            buffer: FrameBuffer::new(),
+            compression: None,
+            inflated: Vec::new(),
+            outgoing: Vec::new(),
+        })
     }
 
     /// Switches to the compressed framing, or back when `threshold` is negative.
     pub fn set_compression(&mut self, threshold: i32) {
         self.compression = (threshold >= 0).then(Inflater::new);
+    }
+
+    /// Encrypts everything sent and received from now on.
+    pub fn enable_encryption(&mut self, shared_secret: &[u8; 16]) -> io::Result<()> {
+        // The peer waits for our response before encrypting, so any byte
+        // already read is out of order.
+        if !self.buffer.pending().is_empty() {
+            return Err(invalid_data("peer sent data before encryption started"));
+        }
+
+        let (encryptor, decryptor) = ciphers(shared_secret);
+        self.writer.enable_encryption(encryptor);
+        self.reader.enable_decryption(decryptor);
+
+        Ok(())
     }
 
     pub async fn read_serverbound(&mut self, state: State) -> io::Result<Option<Serverbound<'_>>> {
@@ -76,7 +99,7 @@ impl Connection {
             add_zero_data_length(&mut self.outgoing)?;
         }
 
-        self.writer.write_all(&self.outgoing).await
+        self.writer.write_all_in_place(&mut self.outgoing).await
     }
 
     pub fn into_parts(self) -> Parts {

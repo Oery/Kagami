@@ -56,7 +56,9 @@ impl Scenario {
 fn main() {
     let server = start_on_thread("bench-server", serve_forever);
     let proxy = free_address();
-    thread::spawn(move || kagami_proxy::run(proxy, &server.to_string()).unwrap());
+    let upstream = kagami_proxy::Upstream { host: server.ip().to_string(), port: server.port() };
+    let config = kagami_proxy::Config { listen: proxy, upstream, account: None };
+    thread::spawn(move || kagami_proxy::run(config).unwrap());
 
     let executor = LocalExecutorBuilder::default().name("bench-client").make().unwrap();
     executor.run(async move {

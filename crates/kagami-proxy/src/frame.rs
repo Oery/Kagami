@@ -71,6 +71,12 @@ impl FrameBuffer {
         &self.bytes[self.start..self.end]
     }
 
+    /// Bytes read but not consumed, for encrypting them in place before
+    /// they are written out.
+    pub fn pending_mut(&mut self) -> &mut [u8] {
+        &mut self.bytes[self.start..self.end]
+    }
+
     pub fn consume(&mut self, len: usize) {
         assert!(len <= self.end - self.start, "consumed more bytes than were read");
         self.start += len;

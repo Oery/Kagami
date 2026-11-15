@@ -1,29 +1,31 @@
 //! One client's session: the proxy answers the handshake, relays status and
 //! login packet by packet, then pumps configuration and play.
 //!
-//! Compression is mirrored: when the server enables it, the proxy forwards
-//! the same threshold to the client, so frames pass through both legs
-//! unchanged.
+//! The client leg is never encrypted. Compression is mirrored: when the
+//! server enables it, the proxy forwards the same threshold to the client,
+//! so frames pass through both legs unchanged.
 
 use std::io;
 
 use futures_lite::future::zip;
 use glommio::net::TcpStream;
 use mc_protocol::packets::client::LoginDisconnect;
-use mc_protocol::packets::server::ServerListPing;
+use mc_protocol::packets::server::{LoginStart, ServerListPing};
 use mc_protocol::packets::{Clientbound, Serverbound};
 use mc_protocol::state::HandshakeIntent;
-use mc_protocol::{Direction, Payload, State};
+use mc_protocol::{Direction, IntoOwned, Payload, State};
 
-use crate::Upstream;
+use crate::Config;
 use crate::connection::Connection;
 use crate::frame::FrameBuffer;
 use crate::invalid_data;
+use crate::online::answer_encryption;
 use crate::pump::{Wire, pump};
 use crate::split::{ReadHalf, WriteHalf};
+use crate::stream::{Reader, Writer};
 
 /// Serves one client connection until either side closes it.
-pub async fn serve(client: TcpStream, upstream: &Upstream) -> io::Result<()> {
+pub async fn serve(client: TcpStream, config: &Config) -> io::Result<()> {
     let mut client = Connection::new(client)?;
 
     let Some(Serverbound::ServerListPing(handshake)) = client.read_serverbound(State::Handshake).await? else {
@@ -32,6 +34,7 @@ pub async fn serve(client: TcpStream, upstream: &Upstream) -> io::Result<()> {
     let version = handshake.version;
     let intent = handshake.next_state;
 
+    let upstream = &config.upstream;
     let server = TcpStream::connect((upstream.host.as_str(), upstream.port)).await?;
     let mut server = Connection::new(server)?;
 
@@ -42,7 +45,7 @@ pub async fn serve(client: TcpStream, upstream: &Upstream) -> io::Result<()> {
     match intent {
         HandshakeIntent::Status => relay_status(&mut client, &mut server).await,
         HandshakeIntent::Login | HandshakeIntent::Transfer => {
-            if !login(&mut client, &mut server).await? {
+            if !login(&mut client, &mut server, config).await? {
                 return Ok(());
             }
 
@@ -64,11 +67,16 @@ async fn relay_status(client: &mut Connection, server: &mut Connection) -> io::R
 
 /// Relays login until both sides enter configuration. Returns `false` when
 /// login ended without it.
-async fn login(client: &mut Connection, server: &mut Connection) -> io::Result<bool> {
+async fn login(client: &mut Connection, server: &mut Connection, config: &Config) -> io::Result<bool> {
     let Some(Serverbound::LoginStart(login_start)) = client.read_serverbound(State::Login).await? else {
         return Err(invalid_data("expected login start"));
     };
 
+    // With an account, the server sees that account whatever the client claims.
+    let login_start = match &config.account {
+        Some(account) => LoginStart { name: account.name.as_str().into(), uuid: account.uuid },
+        None => login_start.into_owned(),
+    };
     server.send(|out| login_start.encode(out)).await?;
 
     loop {
@@ -93,8 +101,17 @@ async fn login(client: &mut Connection, server: &mut Connection) -> io::Result<b
                     return Ok(false);
                 }
             }
-            Clientbound::EncryptionRequest(_) => {
-                return refuse(client, "Kagami does not support online-mode servers yet").await;
+            // Only the server leg is encrypted, so the client never sees this.
+            Clientbound::EncryptionRequest(request) => {
+                let Some(account) = &config.account else {
+                    return refuse(client, "This server is in online mode: start Kagami with your Minecraft account").await;
+                };
+
+                let request = request.into_owned();
+
+                if let Err(error) = answer_encryption(server, &request, account).await {
+                    return refuse(client, &error.to_string()).await;
+                }
             }
             Clientbound::SetCompression(compression) => {
                 client.send(|out| compression.encode(out)).await?;
@@ -116,7 +133,7 @@ async fn login(client: &mut Connection, server: &mut Connection) -> io::Result<b
 
 /// Tells the client why login stopped, then fails the session with the same reason.
 async fn refuse(client: &mut Connection, reason: &str) -> io::Result<bool> {
-    let json = format!(r#"{{"text":"{reason}"}}"#);
+    let json = serde_json::json!({ "text": reason }).to_string();
     let disconnect = LoginDisconnect { reason: json.into() };
     client.send(|out| disconnect.encode(out)).await?;
 
@@ -162,7 +179,9 @@ async fn pump_both(client: Connection, server: Connection) -> io::Result<()> {
 /// When one direction ends, it closes the socket it was writing to. That
 /// ends the other direction's read on the same socket, so no read is ever
 /// cancelled mid-flight.
-async fn pump_until_closed(wire: Wire, mut buffer: FrameBuffer, mut reader: ReadHalf, mut writer: WriteHalf) -> io::Result<()> {
+async fn pump_until_closed(
+    wire: Wire, mut buffer: FrameBuffer, mut reader: Reader<ReadHalf>, mut writer: Writer<WriteHalf>,
+) -> io::Result<()> {
     let pumped = pump(wire, State::Config, &mut buffer, &mut reader, &mut writer).await;
 
     // The peer may already be gone; the pump's own result is what matters.

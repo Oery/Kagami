@@ -3,23 +3,29 @@
 //! The proxy sits between one Minecraft client and one server on the same
 //! machine. It answers the handshake itself, relays status and login packet
 //! by packet, and then forwards configuration and play frames unchanged.
+//! Online-mode servers are joined with the caller's [`Account`].
 //! Linux only: it runs on Glommio's io_uring executor, on one thread.
 
+mod cipher;
 mod compression;
 mod connection;
 mod frame;
+mod online;
 mod pump;
 mod session;
 mod split;
+mod stream;
 mod transition;
 
 use std::error::Error;
 use std::io;
 use std::net::SocketAddr;
+use std::rc::Rc;
 
 use glommio::LocalExecutorBuilder;
 use glommio::net::TcpListener;
 
+pub use online::Account;
 pub use session::serve;
 
 const DEFAULT_PORT: u16 = 25565;
@@ -50,24 +56,32 @@ impl Upstream {
     }
 }
 
-/// Listens on `listen` and proxies every client to `server`, forever.
-/// Starts its own single-threaded executor and blocks the calling thread.
-pub fn run(listen: SocketAddr, server: &str) -> io::Result<()> {
-    let upstream = Upstream::parse(server)?;
-    let executor = LocalExecutorBuilder::default().name("kagami").make()?;
-
-    executor.run(accept_forever(listen, upstream))
+/// What the proxy listens on and connects to.
+pub struct Config {
+    pub listen: SocketAddr,
+    pub upstream: Upstream,
+    /// Needed for online-mode servers; offline servers accept any name.
+    pub account: Option<Account>,
 }
 
-async fn accept_forever(listen: SocketAddr, upstream: Upstream) -> io::Result<()> {
-    let listener = TcpListener::bind(listen)?;
+/// Proxies every client that connects to `config.listen`, forever. Starts
+/// its own single-threaded executor and blocks the calling thread.
+pub fn run(config: Config) -> io::Result<()> {
+    let executor = LocalExecutorBuilder::default().name("kagami").make()?;
+
+    executor.run(accept_forever(Rc::new(config)))
+}
+
+async fn accept_forever(config: Rc<Config>) -> io::Result<()> {
+    let listener = TcpListener::bind(config.listen)?;
 
     loop {
         let client = listener.accept().await?;
-        let upstream = upstream.clone();
+        let config = config.clone();
+
         // Server list pings open their own short connections next to a game session.
         glommio::spawn_local(async move {
-            if let Err(error) = serve(client, &upstream).await {
+            if let Err(error) = serve(client, &config).await {
                 eprintln!("kagami: session ended: {error}");
             }
         })
