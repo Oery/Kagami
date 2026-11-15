@@ -1,4 +1,3 @@
-use futures_lite::AsyncWriteExt;
 use uuid::Uuid;
 
 use crate::decode::take_array;
@@ -10,8 +9,8 @@ impl<'p> PacketWriter<'p> for Uuid {
         Ok(Uuid::from_bytes(take_array(input)?))
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        w.write_all(self.as_bytes()).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.extend_from_slice(self.as_bytes());
         Ok(())
     }
 

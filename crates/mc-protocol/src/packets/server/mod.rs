@@ -1,5 +1,3 @@
-use futures_lite::AsyncWrite;
-
 use crate::VarInt;
 use crate::data::config::*;
 use crate::packets::PacketWriter;

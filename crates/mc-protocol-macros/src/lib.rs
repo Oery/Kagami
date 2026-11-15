@@ -73,15 +73,15 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
         State::Play => quote!(Play),
     };
     let mut decodes = Vec::new();
-    let mut writes = Vec::new();
+    let mut encodes = Vec::new();
     let mut lengths = Vec::new();
     for field in &fields {
         let ident = &field.ident;
         let ty = &field.ty;
-        let (decode, write, length) = match Format::parse(&field.attrs)? {
+        let (decode, encode, length) = match Format::parse(&field.attrs)? {
             Format::Standard => (
                 quote!(let #ident = <#ty>::read(buf)?;),
-                quote!(self.#ident.write(w).await?;),
+                quote!(self.#ident.encode(out)?;),
                 quote!(self.#ident.body_len()),
             ),
             Format::VarInt => {
@@ -95,7 +95,7 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
                 };
                 (
                     quote!(let #ident: #ty = #value;),
-                    quote!(VarInt(self.#ident as i32).write(w).await?;),
+                    quote!(VarInt(self.#ident as i32).encode(out)?;),
                     quote!(VarInt(self.#ident as i32).body_len()),
                 )
             }
@@ -106,13 +106,13 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
                 },
                 quote! {
                     let json = serde_json::to_string(&self.#ident)?;
-                    json.as_str().write(w).await?;
+                    json.as_str().encode(out)?;
                 },
                 quote!(serde_json::to_string(&self.#ident)?.as_str().body_len()),
             ),
         };
         decodes.push(decode);
-        writes.push(write);
+        encodes.push(encode);
         lengths.push(length);
     }
     let names = fields.iter().map(|field| &field.ident);
@@ -138,8 +138,8 @@ fn expand_packet(attributes: PacketAttributes, item: &DeriveInput) -> syn::Resul
                 Ok(#construct)
             }
 
-            async fn write_payload<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-                #(#writes)*
+            fn encode_payload(&self, out: &mut Vec<u8>) -> EncodeResult {
+                #(#encodes)*
                 Ok(())
             }
         }

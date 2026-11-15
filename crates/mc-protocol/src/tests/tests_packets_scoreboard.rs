@@ -1,9 +1,8 @@
 use super::*;
-use futures_lite::future::block_on;
 
 fn body<'p>(packet: &impl Payload<'p>, id: i32) -> Vec<u8> {
     let mut bytes = Vec::new();
-    block_on(packet.write_packet(&mut bytes)).unwrap();
+    packet.encode(&mut bytes).unwrap();
     let mut input = bytes.as_slice();
     assert_eq!(VarInt::read(&mut input).unwrap().0 as usize, input.len());
     assert_eq!(VarInt::read(&mut input).unwrap().0, id);

@@ -1,5 +1,3 @@
-use futures_lite::AsyncWriteExt;
-
 use crate::decode::{MAX_COLLECTION_LEN, read_length, take};
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
@@ -16,9 +14,9 @@ impl<'p> PacketWriter<'p> for &'p str {
         Ok(str)
     }
 
-    async fn write<T: AsyncWriteExt + Unpin>(&self, w: &mut T) -> crate::encode::Result {
-        VarInt(self.len() as i32).write(w).await?;
-        w.write_all(self.as_bytes()).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        VarInt(self.len() as i32).encode(out)?;
+        out.extend_from_slice(self.as_bytes());
 
         Ok(())
     }
@@ -43,11 +41,11 @@ impl<'p, T: PacketWriter<'p>> PacketWriter<'p> for Vec<T> {
         Ok(elements)
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        VarInt(self.len() as i32).write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        VarInt(self.len() as i32).encode(out)?;
 
         for e in self {
-            e.write(w).await?;
+            e.encode(out)?;
         }
 
         Ok(())
@@ -75,11 +73,11 @@ impl<'p, T: PacketWriter<'p>> PacketWriter<'p> for Option<T> {
         Ok(data)
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        self.is_some().write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.is_some().encode(out)?;
 
         if let Some(data) = self {
-            data.write(w).await?;
+            data.encode(out)?;
         }
 
         Ok(())

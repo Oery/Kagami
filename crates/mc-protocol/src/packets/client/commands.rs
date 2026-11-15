@@ -1,5 +1,4 @@
 //! Command trees with literals, words, numeric arguments and world coordinates.
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use crate::State;
@@ -94,7 +93,7 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
         Ok(Self { kind, children, executable: flags & 4 != 0 })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         let flags = match self.kind {
             CommandNodeKind::Root => 0,
             CommandNodeKind::Literal(_) => 1,
@@ -103,33 +102,33 @@ impl<'p> PacketWriter<'p> for CommandNode<'p> {
             CommandNodeKind::Number { .. } => 2,
             CommandNodeKind::Position { .. } => 2,
         } | if self.executable { 4 } else { 0 };
-        (flags as u8).write(w).await?;
-        self.children.write(w).await?;
+        (flags as u8).encode(out)?;
+        self.children.encode(out)?;
         match self.kind {
             CommandNodeKind::Root => {}
-            CommandNodeKind::Literal(name) => name.write(w).await?,
+            CommandNodeKind::Literal(name) => name.encode(out)?,
             CommandNodeKind::Word { name, suggest } => {
-                name.write(w).await?;
-                VarInt(5).write(w).await?;
-                VarInt(0).write(w).await?;
+                name.encode(out)?;
+                VarInt(5).encode(out)?;
+                VarInt(0).encode(out)?;
                 if suggest {
-                    "minecraft:ask_server".write(w).await?;
+                    "minecraft:ask_server".encode(out)?;
                 }
             }
             CommandNodeKind::GreedyText { name } => {
-                name.write(w).await?;
-                VarInt(5).write(w).await?;
-                VarInt(2).write(w).await?;
+                name.encode(out)?;
+                VarInt(5).encode(out)?;
+                VarInt(2).encode(out)?;
             }
             CommandNodeKind::Number { name, kind } => {
-                name.write(w).await?;
-                VarInt(kind.parser()).write(w).await?;
-                0u8.write(w).await?;
+                name.encode(out)?;
+                VarInt(kind.parser()).encode(out)?;
+                0u8.encode(out)?;
             }
             CommandNodeKind::Position { name } => {
-                name.write(w).await?;
+                name.encode(out)?;
                 // minecraft:vec3 (26.3); singleton parser, no properties.
-                VarInt(10).write(w).await?;
+                VarInt(10).encode(out)?;
             }
         }
         Ok(())
@@ -171,9 +170,9 @@ impl<'p> PacketWriter<'p> for CommandMatch<'p> {
         Ok(Self { text })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.text.write(w).await?;
-        false.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        self.text.encode(out)?;
+        false.encode(out)
     }
 
     fn body_len(&self) -> usize {

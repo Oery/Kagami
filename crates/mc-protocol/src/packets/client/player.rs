@@ -1,6 +1,5 @@
 //! The Play login packet.
 
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use super::DeathLocation;

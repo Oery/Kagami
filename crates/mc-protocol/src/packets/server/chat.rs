@@ -2,7 +2,6 @@
 use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
-use futures_lite::{AsyncWrite, AsyncWriteExt};
 use mc_protocol_macros::{Payload, packet};
 
 use crate::decode::{read_length, take};
@@ -22,11 +21,11 @@ impl<'p> PacketWriter<'p> for ChatText<'p> {
         }
         Ok(Self(text))
     }
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> Result<(), EncodeError> {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         if self.0.encode_utf16().count() > 256 {
             return Err(EncodeError::InvalidLength);
         }
-        self.0.write(w).await
+        self.0.encode(out)
     }
     fn body_len(&self) -> usize {
         self.0.body_len()
@@ -40,11 +39,11 @@ impl<'p> PacketWriter<'p> for Signature<'p> {
     fn read(input: &mut &'p [u8]) -> Result<Self, DecodeError> {
         Ok(Self(take(input, 256)?))
     }
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> Result<(), EncodeError> {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         if self.0.len() != 256 {
             return Err(EncodeError::InvalidLength);
         }
-        w.write_all(self.0).await?;
+        out.extend_from_slice(self.0);
         Ok(())
     }
     fn body_len(&self) -> usize {
@@ -69,10 +68,10 @@ impl<'p> PacketWriter<'p> for LastSeen {
         let checksum = u8::read(input)?;
         Ok(Self { count, acknowledged, checksum })
     }
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> Result<(), EncodeError> {
-        VarInt(self.count).write(w).await?;
-        w.write_all(&self.acknowledged).await?;
-        self.checksum.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        VarInt(self.count).encode(out)?;
+        out.extend_from_slice(&self.acknowledged);
+        self.checksum.encode(out)
     }
     fn body_len(&self) -> usize {
         VarInt(self.count).body_len() + 4
@@ -96,14 +95,14 @@ impl<'p> PacketWriter<'p> for ArgumentSignatures<'p> {
         }
         Ok(Self(signatures))
     }
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> Result<(), EncodeError> {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         if self.0.len() > 8 {
             return Err(EncodeError::InvalidLength);
         }
-        VarInt(self.0.len() as i32).write(w).await?;
+        VarInt(self.0.len() as i32).encode(out)?;
         for (name, signature) in &self.0 {
-            name.write(w).await?;
-            signature.write(w).await?;
+            name.encode(out)?;
+            signature.encode(out)?;
         }
         Ok(())
     }

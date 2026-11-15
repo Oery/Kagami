@@ -1,5 +1,4 @@
 //! Protocol 777 boss events (Minecraft Wiki, cross-checked with the 26.3 client).
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 use uuid::Uuid;
 
@@ -21,8 +20,8 @@ macro_rules! ordinal {
                     _ => Err(DecodeError::EnumOutOfRange),
                 }
             }
-            async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-                VarInt(*self as i32).write(w).await
+            fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+                VarInt(*self as i32).encode(out)
             }
             fn body_len(&self) -> usize { 1 }
         }
@@ -59,33 +58,33 @@ impl<'p> PacketWriter<'p> for BossBarAction<'p> {
             _ => return Err(DecodeError::EnumOutOfRange),
         })
     }
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         match self {
             Self::Add { title, progress, color, overlay, flags } => {
-                VarInt(0).write(w).await?;
-                title.write(w).await?;
-                progress.write(w).await?;
-                color.write(w).await?;
-                overlay.write(w).await?;
-                flags.write(w).await
+                VarInt(0).encode(out)?;
+                title.encode(out)?;
+                progress.encode(out)?;
+                color.encode(out)?;
+                overlay.encode(out)?;
+                flags.encode(out)
             }
-            Self::Remove => VarInt(1).write(w).await,
+            Self::Remove => VarInt(1).encode(out),
             Self::Progress(value) => {
-                VarInt(2).write(w).await?;
-                value.write(w).await
+                VarInt(2).encode(out)?;
+                value.encode(out)
             }
             Self::Title(value) => {
-                VarInt(3).write(w).await?;
-                value.write(w).await
+                VarInt(3).encode(out)?;
+                value.encode(out)
             }
             Self::Style { color, overlay } => {
-                VarInt(4).write(w).await?;
-                color.write(w).await?;
-                overlay.write(w).await
+                VarInt(4).encode(out)?;
+                color.encode(out)?;
+                overlay.encode(out)
             }
             Self::Flags(value) => {
-                VarInt(5).write(w).await?;
-                value.write(w).await
+                VarInt(5).encode(out)?;
+                value.encode(out)
             }
         }
     }

@@ -1,5 +1,3 @@
-use futures_lite::AsyncWrite;
-
 use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;

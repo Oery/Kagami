@@ -15,7 +15,7 @@ fn vectors_match_official_26_3_codec_and_bound_quantization() {
     ] {
         let vector = LpVec3(values);
         let mut bytes = Vec::new();
-        futures_lite::future::block_on(vector.write(&mut bytes)).unwrap();
+        vector.encode(&mut bytes).unwrap();
         assert_eq!(bytes, expected);
         assert_eq!(bytes.len(), vector.body_len());
         let mut input = bytes.as_slice();

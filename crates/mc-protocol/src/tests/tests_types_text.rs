@@ -8,7 +8,7 @@ fn empty_text_omits_the_extra_list_and_encodes_a_literal_empty_component() {
     assert_eq!(fields(&nbt).len(), 1);
     assert!(matches!(field(&nbt, "text"), Nbt::Str("")));
     let mut bytes = Vec::new();
-    futures_lite::future::block_on(nbt.write(&mut bytes)).unwrap();
+    nbt.encode(&mut bytes).unwrap();
     assert_eq!(bytes, b"\x0a\x08\x00\x04text\x00\x00\x00");
     assert_eq!(nbt.body_len(), bytes.len());
 }

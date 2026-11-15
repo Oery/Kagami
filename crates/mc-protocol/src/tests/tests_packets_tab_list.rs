@@ -1,5 +1,4 @@
 use super::*;
-use futures_lite::future::block_on;
 
 #[test]
 fn tab_list_encodes_two_anonymous_nbt_components_with_exact_lengths() {
@@ -13,11 +12,11 @@ fn tab_list_encodes_two_anonymous_nbt_components_with_exact_lengths() {
     ] {
         let packet = TabList { header, footer };
         let mut bytes = Vec::new();
-        block_on(packet.write_payload(&mut bytes)).unwrap();
+        packet.encode_payload(&mut bytes).unwrap();
         assert_eq!(bytes, expected);
         assert_eq!(packet.payload_len().unwrap(), bytes.len());
         let mut framed = Vec::new();
-        block_on(packet.write_packet(&mut framed)).unwrap();
+        packet.encode(&mut framed).unwrap();
         let mut input = framed.as_slice();
         assert_eq!(VarInt::read(&mut input).unwrap().0 as usize, bytes.len() + 1);
         assert_eq!(VarInt::read(&mut input).unwrap().0, 0x7D);

@@ -1,7 +1,6 @@
 //! Protocol 777's quantized vector, checked against the official LpVec3 codec.
 use super::VarInt;
 use crate::{decode::Result as DecodeResult, encode::Result as EncodeResult, packets::PacketWriter};
-use futures_lite::{AsyncWrite, AsyncWriteExt};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct LpVec3(pub [f64; 3]);
@@ -44,14 +43,14 @@ impl PacketWriter<'_> for LpVec3 {
             (((packed >> offset) & 32767).min(32766) as f64 * 2.0 / 32766.0 - 1.0) * scale as f64
         })))
     }
-    async fn write<W: AsyncWrite + Unpin>(&self, writer: &mut W) -> EncodeResult {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         let Some((packed, scale)) = self.packed() else {
-            return 0u8.write(writer).await;
+            return 0u8.encode(out);
         };
-        writer.write_all(&[packed as u8, (packed >> 8) as u8]).await?;
-        ((packed >> 16) as i32).write(writer).await?;
+        out.extend_from_slice(&[packed as u8, (packed >> 8) as u8]);
+        ((packed >> 16) as i32).encode(out)?;
         if scale > 3 {
-            VarInt((scale >> 2) as i32).write(writer).await?;
+            VarInt((scale >> 2) as i32).encode(out)?;
         }
         Ok(())
     }

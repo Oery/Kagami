@@ -1,5 +1,4 @@
 //! Screens, respawn and combat packets for protocol 777.
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use crate::State;
@@ -49,9 +48,9 @@ impl<'p> PacketWriter<'p> for DeathLocation<'p> {
     fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
         Ok(Self { dimension: <&str>::read(input)?, location: i64::read(input)? })
     }
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.dimension.write(w).await?;
-        self.location.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        self.dimension.encode(out)?;
+        self.location.encode(out)
     }
     fn body_len(&self) -> usize {
         self.dimension.body_len() + 8
@@ -96,10 +95,10 @@ impl PacketWriter<'_> for DamagePosition {
     fn read(input: &mut &[u8]) -> DecodeResult<Self> {
         Ok(Self { x: f64::read(input)?, y: f64::read(input)?, z: f64::read(input)? })
     }
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.x.write(w).await?;
-        self.y.write(w).await?;
-        self.z.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        self.x.encode(out)?;
+        self.y.encode(out)?;
+        self.z.encode(out)
     }
     fn body_len(&self) -> usize {
         24

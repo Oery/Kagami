@@ -1,8 +1,8 @@
-use futures_lite::AsyncWrite;
+use futures_lite::{AsyncWrite, AsyncWriteExt};
 use uuid::Uuid;
 
 use crate::auth::Property;
-use crate::error::DecodeError;
+use crate::error::{DecodeError, EncodeError};
 use crate::packets::client::*;
 use crate::packets::server::*;
 use crate::state::State;
@@ -135,16 +135,16 @@ impl<'p> Packets<'p> {
     }
 }
 
-// These traits deliberately support local, non-Send transports (Glommio).
-#[allow(async_fn_in_trait)]
+/// A field codec. Decoding borrows from the input; encoding appends to `out`.
 pub trait PacketWriter<'p>: Sized {
     fn read(buf: &mut &'p [u8]) -> DecodeResult<Self>;
 
-    async fn write<T: AsyncWrite + Unpin>(&self, w: &mut T) -> EncodeResult;
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult;
 
     fn body_len(&self) -> usize;
 }
 
+// Deliberately supports local, non-Send transports (Glommio).
 #[allow(async_fn_in_trait)]
 pub trait Payload<'p>: Sized {
     const ID: VarInt;
@@ -154,21 +154,24 @@ pub trait Payload<'p>: Sized {
 
     fn decode_payload(buf: &mut &'p [u8]) -> DecodeResult<Self>;
 
-    async fn write_payload<W>(&self, w: &mut W) -> EncodeResult
-    where
-        W: AsyncWrite + Unpin;
+    fn encode_payload(&self, out: &mut Vec<u8>) -> EncodeResult;
+
+    /// Appends the uncompressed frame: length, packet id, then the payload.
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        let length = Self::ID.body_len() + self.payload_len()?;
+        let length = i32::try_from(length).map_err(|_| EncodeError::InvalidLength)?;
+        VarInt(length).encode(out)?;
+        Self::ID.encode(out)?;
+        self.encode_payload(out)
+    }
 
     async fn write_packet<W>(&self, w: &mut W) -> EncodeResult
     where
         W: AsyncWrite + Unpin,
     {
-        let length = Self::ID.body_len() + self.payload_len()?;
-        VarInt(length as i32).write(w).await?;
-
-        Self::ID.write(w).await?;
-
-        self.write_payload(w).await?;
-
+        let mut frame = Vec::new();
+        self.encode(&mut frame)?;
+        w.write_all(&frame).await?;
         Ok(())
     }
 }

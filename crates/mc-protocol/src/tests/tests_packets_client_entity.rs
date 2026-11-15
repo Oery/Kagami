@@ -1,16 +1,14 @@
 use super::*;
 
 fn frame<P: Payload<'static>>(packet: &P) -> Vec<u8> {
-    futures_lite::future::block_on(async {
-        let mut bytes = Vec::new();
-        packet.write_packet(&mut bytes).await.unwrap();
-        let mut input = bytes.as_slice();
-        let length = VarInt::read(&mut input).unwrap().0 as usize;
-        assert_eq!(input.len(), length);
-        assert_eq!(VarInt::read(&mut input).unwrap().0, P::ID.0);
-        assert_eq!(input.len(), packet.payload_len().unwrap());
-        bytes
-    })
+    let mut bytes = Vec::new();
+    packet.encode(&mut bytes).unwrap();
+    let mut input = bytes.as_slice();
+    let length = VarInt::read(&mut input).unwrap().0 as usize;
+    assert_eq!(input.len(), length);
+    assert_eq!(VarInt::read(&mut input).unwrap().0, P::ID.0);
+    assert_eq!(input.len(), packet.payload_len().unwrap());
+    bytes
 }
 
 #[test]

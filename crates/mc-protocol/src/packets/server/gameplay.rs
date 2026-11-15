@@ -1,5 +1,4 @@
 //! Serverbound gameplay packets for protocol 777.
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use crate::State;
@@ -109,11 +108,11 @@ impl<'p> PacketWriter<'p> for HashedItem {
         Ok(Self { item_id, count, added, removed })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        VarInt(self.item_id).write(w).await?;
-        VarInt(self.count).write(w).await?;
-        self.added.write(w).await?;
-        self.removed.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        VarInt(self.item_id).encode(out)?;
+        VarInt(self.count).encode(out)?;
+        self.added.encode(out)?;
+        self.removed.encode(out)
     }
 
     fn body_len(&self) -> usize {
@@ -133,9 +132,9 @@ impl<'p> PacketWriter<'p> for ComponentHash {
         Ok(Self { component: VarInt::read(input)?.0, hash: i32::read(input)? })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        VarInt(self.component).write(w).await?;
-        self.hash.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        VarInt(self.component).encode(out)?;
+        self.hash.encode(out)
     }
 
     fn body_len(&self) -> usize {
@@ -154,9 +153,9 @@ impl<'p> PacketWriter<'p> for ChangedSlot {
         Ok(Self { slot: i16::read(input)?, item: Option::read(input)? })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.slot.write(w).await?;
-        self.item.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        self.slot.encode(out)?;
+        self.item.encode(out)
     }
 
     fn body_len(&self) -> usize {

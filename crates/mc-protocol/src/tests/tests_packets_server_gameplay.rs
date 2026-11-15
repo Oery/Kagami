@@ -30,7 +30,7 @@ fn click_container_keeps_hashed_predictions() {
     assert!(click.carried.is_none());
 
     let mut encoded = Vec::new();
-    futures_lite::future::block_on(click.write_payload(&mut encoded)).unwrap();
+    click.encode_payload(&mut encoded).unwrap();
     assert_eq!(encoded, bytes);
     assert_eq!(click.payload_len().unwrap(), bytes.len());
     assert!(ClickContainer::decode_payload(&mut &bytes[..bytes.len() - 1]).is_err());

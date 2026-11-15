@@ -1,10 +1,9 @@
 use super::*;
-use futures_lite::future::block_on;
 
 fn check(action: BossBarAction<'_>, expected: &[u8]) {
     let packet = BossBar { id: Uuid::from_bytes([0x42; 16]), action };
     let mut bytes = Vec::new();
-    block_on(packet.write_payload(&mut bytes)).unwrap();
+    packet.encode_payload(&mut bytes).unwrap();
     assert_eq!(packet.payload_len().unwrap(), bytes.len());
     assert_eq!(&bytes[..16], &[0x42; 16]);
     assert_eq!(&bytes[16..], expected);
@@ -14,11 +13,11 @@ fn check(action: BossBarAction<'_>, expected: &[u8]) {
         let decoded = BossBar::decode_payload(&mut input).unwrap();
         assert!(input.is_empty());
         let mut roundtrip = Vec::new();
-        block_on(decoded.write_payload(&mut roundtrip)).unwrap();
+        decoded.encode_payload(&mut roundtrip).unwrap();
         assert_eq!(bytes, roundtrip);
     }
     let mut framed = Vec::new();
-    block_on(packet.write_packet(&mut framed)).unwrap();
+    packet.encode(&mut framed).unwrap();
     let mut input = framed.as_slice();
     assert_eq!(VarInt::read(&mut input).unwrap().0 as usize, bytes.len() + 1);
     assert_eq!(VarInt::read(&mut input).unwrap().0, 0x09);

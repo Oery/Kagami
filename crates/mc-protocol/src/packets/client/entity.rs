@@ -1,6 +1,5 @@
 //! Entity spawning, movement and removal for protocol 777.
 
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 use uuid::Uuid;
 

@@ -9,11 +9,8 @@ impl PacketWriter<'_> for SkinParts {
         Ok(SkinParts(u8::read(buf)?))
     }
 
-    async fn write<W>(&self, w: &mut W) -> crate::encode::Result
-    where
-        W: futures_lite::AsyncWriteExt + Unpin,
-    {
-        self.0.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.0.encode(out)?;
         Ok(())
     }
 

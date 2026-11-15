@@ -1,6 +1,5 @@
 //! Cosmetic protocol 777 feedback: swings, entity animations, sounds and particles.
 
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use crate::State;
@@ -70,10 +69,10 @@ impl<'p> PacketWriter<'p> for InlineSound<'p> {
         Ok(Self { name: <&str>::read(buf)?, fixed_range: Option::read(buf)? })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        VarInt(0).write(w).await?;
-        self.name.write(w).await?;
-        self.fixed_range.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        VarInt(0).encode(out)?;
+        self.name.encode(out)?;
+        self.fixed_range.encode(out)
     }
 
     fn body_len(&self) -> usize {
@@ -146,14 +145,14 @@ impl<'p> Payload<'p> for StopSound<'p> {
         Ok(Self { category, name })
     }
 
-    async fn write_payload<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+    fn encode_payload(&self, out: &mut Vec<u8>) -> EncodeResult {
         let flags = u8::from(self.category.is_some()) | (u8::from(self.name.is_some()) << 1);
-        flags.write(w).await?;
+        flags.encode(out)?;
         if let Some(category) = self.category {
-            VarInt(category).write(w).await?;
+            VarInt(category).encode(out)?;
         }
         if let Some(name) = self.name {
-            name.write(w).await?;
+            name.encode(out)?;
         }
         Ok(())
     }
@@ -249,10 +248,10 @@ impl<'p> PacketWriter<'p> for AttributeModifier<'p> {
         Ok(Self { id: <&str>::read(buf)?, amount: f64::read(buf)?, operation: u8::read(buf)? })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.id.write(w).await?;
-        self.amount.write(w).await?;
-        self.operation.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        self.id.encode(out)?;
+        self.amount.encode(out)?;
+        self.operation.encode(out)
     }
 
     fn body_len(&self) -> usize {
@@ -274,10 +273,10 @@ impl<'p> PacketWriter<'p> for AttributeSnapshot<'p> {
         Ok(Self { attribute: VarInt::read(buf)?.0, base: f64::read(buf)?, modifiers: Vec::read(buf)? })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        VarInt(self.attribute).write(w).await?;
-        self.base.write(w).await?;
-        self.modifiers.write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        VarInt(self.attribute).encode(out)?;
+        self.base.encode(out)?;
+        self.modifiers.encode(out)
     }
 
     fn body_len(&self) -> usize {

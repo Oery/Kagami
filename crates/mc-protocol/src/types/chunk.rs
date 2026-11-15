@@ -1,5 +1,3 @@
-use futures_lite::AsyncWrite;
-
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::packets::PacketWriter;
@@ -18,9 +16,9 @@ impl<'p> PacketWriter<'p> for Heightmap {
         Ok(Self { kind, data })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.kind.write(w).await?;
-        self.data.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        self.kind.encode(out)?;
+        self.data.encode(out)?;
         Ok(())
     }
 
@@ -46,11 +44,11 @@ impl<'p> PacketWriter<'p> for BlockEntity<'p> {
         Ok(Self { packed_xz, y, kind, data })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.packed_xz.write(w).await?;
-        self.y.write(w).await?;
-        VarInt(self.kind).write(w).await?;
-        self.data.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        self.packed_xz.encode(out)?;
+        self.y.encode(out)?;
+        VarInt(self.kind).encode(out)?;
+        self.data.encode(out)?;
         Ok(())
     }
 
@@ -104,13 +102,13 @@ impl<'p> PacketWriter<'p> for LightData<'p> {
         Ok(Self { sky_mask, block_mask, empty_sky_mask, empty_block_mask, sky_light, block_light })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.sky_mask.write(w).await?;
-        self.block_mask.write(w).await?;
-        self.empty_sky_mask.write(w).await?;
-        self.empty_block_mask.write(w).await?;
-        self.sky_light.write(w).await?;
-        self.block_light.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        self.sky_mask.encode(out)?;
+        self.block_mask.encode(out)?;
+        self.empty_sky_mask.encode(out)?;
+        self.empty_block_mask.encode(out)?;
+        self.sky_light.encode(out)?;
+        self.block_light.encode(out)?;
         Ok(())
     }
 

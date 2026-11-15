@@ -2,7 +2,7 @@ use super::*;
 
 fn encode<'p>(packet: &impl Payload<'p>) -> Vec<u8> {
     let mut bytes = Vec::new();
-    futures_lite::future::block_on(packet.write_payload(&mut bytes)).unwrap();
+    packet.encode_payload(&mut bytes).unwrap();
     assert_eq!(bytes.len(), packet.payload_len().unwrap());
     bytes
 }
@@ -49,7 +49,7 @@ fn stop_sound_flags_control_optional_fields_and_frame_lengths() {
         assert_eq!(StopSound::decode_payload(&mut input).unwrap(), packet);
         assert!(input.is_empty());
         let mut frame = Vec::new();
-        futures_lite::future::block_on(packet.write_packet(&mut frame)).unwrap();
+        packet.encode(&mut frame).unwrap();
         assert_eq!(frame[0] as usize, expected.len() + 1);
         assert_eq!(frame[1], 0x79);
         assert_eq!(&frame[2..], expected);
@@ -58,7 +58,7 @@ fn stop_sound_flags_control_optional_fields_and_frame_lengths() {
     let name = format!("a:{}", "b".repeat(128));
     let packet = StopSound { category: Some(7), name: Some(&name) };
     let mut frame = Vec::new();
-    futures_lite::future::block_on(packet.write_packet(&mut frame)).unwrap();
+    packet.encode(&mut frame).unwrap();
     let mut input = frame.as_slice();
     assert_eq!(VarInt::read(&mut input).unwrap().0 as usize, input.len());
     assert_eq!(VarInt::read(&mut input).unwrap().0, 0x79);

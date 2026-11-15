@@ -1,5 +1,4 @@
 //! Protocol 777 presentation team creation and removal.
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use crate::State;
@@ -46,19 +45,19 @@ impl<'p> PacketWriter<'p> for TeamAction<'p> {
         }
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         let Self::Create(properties) = self else {
-            return 1u8.write(w).await;
+            return 1u8.encode(out);
         };
-        0u8.write(w).await?;
-        properties.display_name.write(w).await?;
-        properties.prefix.write(w).await?;
-        properties.suffix.write(w).await?;
-        VarInt(properties.name_tag_visibility).write(w).await?;
-        VarInt(properties.collision_rule).write(w).await?;
-        properties.color.write(w).await?;
-        properties.friendly_flags.write(w).await?;
-        properties.entities.write(w).await
+        0u8.encode(out)?;
+        properties.display_name.encode(out)?;
+        properties.prefix.encode(out)?;
+        properties.suffix.encode(out)?;
+        VarInt(properties.name_tag_visibility).encode(out)?;
+        VarInt(properties.collision_rule).encode(out)?;
+        properties.color.encode(out)?;
+        properties.friendly_flags.encode(out)?;
+        properties.entities.encode(out)
     }
 
     fn body_len(&self) -> usize {

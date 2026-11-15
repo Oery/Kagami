@@ -40,11 +40,9 @@ fn packet_macros_preserve_qualified_generic_types_and_declared_names_and_lifetim
 }
 
 fn encode<'p, T: Payload<'p>>(v: &T) -> Vec<u8> {
-    futures_lite::future::block_on(async {
-        let mut buf = Vec::new();
-        v.write_packet(&mut buf).await.unwrap();
-        buf
-    })
+    let mut buf = Vec::new();
+    v.encode(&mut buf).unwrap();
+    buf
 }
 
 #[test]

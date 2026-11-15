@@ -1,5 +1,3 @@
-use futures_lite::AsyncWriteExt;
-
 use crate::decode::take;
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
@@ -26,15 +24,15 @@ impl<'p> PacketWriter<'p> for VarInt {
         Err(DecodeError::InvalidVarInt)
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
         let mut value = self.0 as u32;
 
         while (value & !0x7F) != 0 {
-            u8::write(&(((value & 0x7F) | 0x80) as u8), w).await?;
+            out.push(((value & 0x7F) | 0x80) as u8);
             value >>= 7;
         }
 
-        u8::write(&(value as u8), w).await?;
+        out.push(value as u8);
         Ok(())
     }
 
@@ -57,8 +55,8 @@ impl<'p> PacketWriter<'p> for u8 {
         Ok(byte[0])
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        w.write_all(&[*self]).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.push(*self);
         Ok(())
     }
 

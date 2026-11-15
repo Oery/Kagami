@@ -1,5 +1,3 @@
-use futures_lite::AsyncWriteExt;
-
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 use crate::types::Nbt;
@@ -20,10 +18,10 @@ impl<'p> PacketWriter<'p> for KnownPack<'p> {
         Ok(KnownPack { namespace, id, version })
     }
 
-    async fn write<T: AsyncWriteExt + Unpin>(&self, w: &mut T) -> crate::encode::Result {
-        self.namespace.write(w).await?;
-        self.id.write(w).await?;
-        self.version.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.namespace.encode(out)?;
+        self.id.encode(out)?;
+        self.version.encode(out)?;
 
         Ok(())
     }
@@ -51,11 +49,11 @@ impl<'p> PacketWriter<'p> for RegistryEntry<'p> {
         Ok(RegistryEntry { id, data })
     }
 
-    async fn write<T: AsyncWriteExt + Unpin>(&self, w: &mut T) -> crate::encode::Result {
-        self.id.write(w).await?;
-        self.data.is_some().write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.id.encode(out)?;
+        self.data.is_some().encode(out)?;
         if let Some(data) = &self.data {
-            data.write(w).await?;
+            data.encode(out)?;
         }
 
         Ok(())
@@ -85,9 +83,9 @@ impl<'p> PacketWriter<'p> for Tag<'p> {
         Ok(Tag { name, entries })
     }
 
-    async fn write<T: AsyncWriteExt + Unpin>(&self, w: &mut T) -> crate::encode::Result {
-        self.name.write(w).await?;
-        self.entries.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.name.encode(out)?;
+        self.entries.encode(out)?;
 
         Ok(())
     }
@@ -111,9 +109,9 @@ impl<'p> PacketWriter<'p> for TaggedRegistry<'p> {
         Ok(TaggedRegistry { registry, tags })
     }
 
-    async fn write<T: AsyncWriteExt + Unpin>(&self, w: &mut T) -> crate::encode::Result {
-        self.registry.write(w).await?;
-        self.tags.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.registry.encode(out)?;
+        self.tags.encode(out)?;
 
         Ok(())
     }

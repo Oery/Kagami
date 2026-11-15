@@ -1,5 +1,3 @@
-use futures_lite::AsyncWriteExt;
-
 use crate::decode::{take, take_array};
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
@@ -9,9 +7,9 @@ impl PacketWriter<'_> for u16 {
         Ok(u16::from_be_bytes(take_array(input)?))
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
         let bytes: [u8; 2] = self.to_be_bytes();
-        w.write_all(&bytes).await?;
+        out.extend_from_slice(&bytes);
 
         Ok(())
     }
@@ -25,8 +23,8 @@ impl PacketWriter<'_> for i32 {
         Ok(i32::from_be_bytes(take_array(input)?))
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        w.write_all(&self.to_be_bytes()).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.extend_from_slice(&self.to_be_bytes());
         Ok(())
     }
 
@@ -39,8 +37,8 @@ impl PacketWriter<'_> for i16 {
         Ok(i16::from_be_bytes(take_array(input)?))
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        w.write_all(&self.to_be_bytes()).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.extend_from_slice(&self.to_be_bytes());
         Ok(())
     }
 
@@ -54,8 +52,8 @@ impl PacketWriter<'_> for f32 {
         Ok(f32::from_be_bytes(take_array(input)?))
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        w.write_all(&self.to_be_bytes()).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.extend_from_slice(&self.to_be_bytes());
         Ok(())
     }
 
@@ -69,8 +67,8 @@ impl PacketWriter<'_> for f64 {
         Ok(f64::from_be_bytes(take_array(input)?))
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        w.write_all(&self.to_be_bytes()).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.extend_from_slice(&self.to_be_bytes());
         Ok(())
     }
 
@@ -84,8 +82,8 @@ impl PacketWriter<'_> for i64 {
         Ok(i64::from_be_bytes(take_array(input)?))
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        w.write_all(&self.to_be_bytes()).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.extend_from_slice(&self.to_be_bytes());
         Ok(())
     }
 
@@ -103,8 +101,8 @@ impl PacketWriter<'_> for bool {
         }
     }
 
-    async fn write<W: AsyncWriteExt + Unpin>(&self, w: &mut W) -> crate::encode::Result {
-        w.write_all(&[*self as u8]).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.push(*self as u8);
         Ok(())
     }
 

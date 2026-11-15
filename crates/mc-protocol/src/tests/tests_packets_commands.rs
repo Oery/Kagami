@@ -7,7 +7,7 @@ use crate::packets::{Context, Packets};
 fn greedy_text_command_nodes_use_brigadier_string_mode_two() {
     let node = CommandNode { kind: CommandNodeKind::GreedyText { name: "message" }, children: vec![], executable: true };
     let mut body = Vec::new();
-    futures_lite::future::block_on(node.write(&mut body)).unwrap();
+    node.encode(&mut body).unwrap();
     assert_eq!(node.body_len(), body.len());
     assert_eq!(&body[body.len() - 2..], &[5, 2]);
     let mut input = body.as_slice();
@@ -17,7 +17,7 @@ fn greedy_text_command_nodes_use_brigadier_string_mode_two() {
 
 fn encode<'p>(packet: &impl Payload<'p>) -> Vec<u8> {
     let mut bytes = Vec::new();
-    futures_lite::future::block_on(packet.write_packet(&mut bytes)).unwrap();
+    packet.encode(&mut bytes).unwrap();
     let mut input = bytes.as_slice();
     assert_eq!(VarInt::read(&mut input).unwrap().0 as usize, input.len());
     VarInt::read(&mut input).unwrap();

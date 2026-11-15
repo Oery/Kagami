@@ -11,7 +11,7 @@ fn chat_decodes_signed_and_unsigned_and_rejects_truncated_metadata() {
     for signature in [None, Some(Signature(&[7; 256]))] {
         let packet = ChatMessage { message: ChatText("Hello, 世界!"), timestamp: 12, salt: 42, signature, seen: seen() };
         let mut body = Vec::new();
-        futures_lite::future::block_on(packet.write_payload(&mut body)).unwrap();
+        packet.encode_payload(&mut body).unwrap();
         assert_eq!(packet.payload_len().unwrap(), body.len());
         let mut input = body.as_slice();
         let decoded = ChatMessage::decode_payload(&mut input).unwrap();
@@ -38,7 +38,7 @@ fn signed_command_consumes_fixed_signatures_and_checksum() {
         seen: seen(),
     };
     let mut body = Vec::new();
-    futures_lite::future::block_on(packet.write_payload(&mut body)).unwrap();
+    packet.encode_payload(&mut body).unwrap();
     assert_eq!(packet.payload_len().unwrap(), body.len());
     let mut input = body.as_slice();
     let decoded = SignedChatCommand::decode_payload(&mut input).unwrap();
@@ -53,7 +53,7 @@ fn signed_command_consumes_fixed_signatures_and_checksum() {
 fn chat_text_limit_counts_utf16_and_checks_lengths_before_reading() {
     for (text, valid) in [("a".repeat(256), true), ("😀".repeat(128), true), ("😀".repeat(129), false)] {
         let mut bytes = Vec::new();
-        futures_lite::future::block_on(text.as_str().write(&mut bytes)).unwrap();
+        text.as_str().encode(&mut bytes).unwrap();
         assert_eq!(ChatText::read(&mut bytes.as_slice()).is_ok(), valid);
     }
     assert!(ChatText::read(&mut [0x81, 0x06].as_slice()).is_err());

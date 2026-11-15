@@ -1,5 +1,4 @@
 //! Protocol 777 scoreboard objectives, display slots and score entries.
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use crate::State;
@@ -25,8 +24,8 @@ impl PacketWriter<'_> for ScoreRender {
         }
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        VarInt(*self as i32).write(w).await
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
+        VarInt(*self as i32).encode(out)
     }
 
     fn body_len(&self) -> usize {
@@ -52,16 +51,16 @@ impl<'p> PacketWriter<'p> for ScoreNumberFormat<'p> {
         }
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         match self {
-            Self::Blank => VarInt(0).write(w).await,
+            Self::Blank => VarInt(0).encode(out),
             Self::Styled(style) => {
-                VarInt(1).write(w).await?;
-                style.write(w).await
+                VarInt(1).encode(out)?;
+                style.encode(out)
             }
             Self::Fixed(text) => {
-                VarInt(2).write(w).await?;
-                text.write(w).await
+                VarInt(2).encode(out)?;
+                text.encode(out)
             }
         }
     }
@@ -106,16 +105,16 @@ impl<'p> PacketWriter<'p> for ObjectiveAction<'p> {
         })
     }
 
-    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+    fn encode(&self, out: &mut Vec<u8>) -> EncodeResult {
         let (mode, properties) = match self {
             Self::Create(properties) => (0u8, properties),
             Self::Update(properties) => (2u8, properties),
-            Self::Remove => return 1u8.write(w).await,
+            Self::Remove => return 1u8.encode(out),
         };
-        mode.write(w).await?;
-        properties.title.write(w).await?;
-        properties.render.write(w).await?;
-        properties.number_format.write(w).await
+        mode.encode(out)?;
+        properties.title.encode(out)?;
+        properties.render.encode(out)?;
+        properties.number_format.encode(out)
     }
 
     fn body_len(&self) -> usize {

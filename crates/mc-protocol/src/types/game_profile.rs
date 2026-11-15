@@ -1,4 +1,3 @@
-use futures_lite::AsyncWriteExt;
 use uuid::Uuid;
 
 use crate::PacketWriter;
@@ -27,10 +26,10 @@ impl<'p> PacketWriter<'p> for GameProfile<'p> {
         Ok(GameProfile { uuid, username, properties })
     }
 
-    async fn write<T: AsyncWriteExt + Unpin>(&self, w: &mut T) -> crate::encode::Result {
-        self.uuid.write(w).await?;
-        self.username.write(w).await?;
-        self.properties.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.uuid.encode(out)?;
+        self.username.encode(out)?;
+        self.properties.encode(out)?;
 
         Ok(())
     }
@@ -49,10 +48,10 @@ impl<'p> PacketWriter<'p> for ProfileProperty<'p> {
         Ok(ProfileProperty { name, value, signature })
     }
 
-    async fn write<T: AsyncWriteExt + Unpin>(&self, w: &mut T) -> crate::encode::Result {
-        self.name.write(w).await?;
-        self.value.write(w).await?;
-        self.signature.write(w).await?;
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.name.encode(out)?;
+        self.value.encode(out)?;
+        self.signature.encode(out)?;
 
         Ok(())
     }

@@ -4,7 +4,6 @@ use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::packets::{PacketWriter, Payload};
 use crate::types::{Nbt, VarInt};
-use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 #[packet(Play, 0x05, Client)]

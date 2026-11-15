@@ -1,5 +1,3 @@
-use futures_lite::AsyncWriteExt;
-
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 
@@ -46,7 +44,7 @@ impl Nbt<'_> {
         }
     }
 
-    fn write_payload(&self, w: &mut Vec<u8>) -> crate::encode::Result {
+    fn encode_payload(&self, w: &mut Vec<u8>) -> crate::encode::Result {
         match self {
             Nbt::Bool(b) => w.push(*b as u8),
             Nbt::Byte(b) => w.push(*b as u8),
@@ -67,14 +65,14 @@ impl Nbt<'_> {
                 let len = i32::try_from(items.len()).map_err(|_| crate::error::EncodeError::InvalidLength)?;
                 w.extend_from_slice(&len.to_be_bytes());
                 for item in items {
-                    item.write_payload(w)?;
+                    item.encode_payload(w)?;
                 }
             }
             Nbt::Compound(entries) => {
                 for (k, v) in entries {
                     w.push(v.id());
                     write_string(w, k)?;
-                    v.write_payload(w)?;
+                    v.encode_payload(w)?;
                 }
                 w.push(0);
             }
@@ -124,13 +122,9 @@ impl PacketWriter<'_> for Nbt<'_> {
         Err(DecodeError::UnexpectedEof)
     }
 
-    async fn write<T: AsyncWriteExt + Unpin>(&self, w: &mut T) -> crate::encode::Result {
-        let mut bytes = Vec::with_capacity(self.body_len());
-        bytes.push(self.id());
-        self.write_payload(&mut bytes)?;
-        w.write_all(&bytes).await?;
-
-        Ok(())
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        out.push(self.id());
+        self.encode_payload(out)
     }
 
     fn body_len(&self) -> usize {
