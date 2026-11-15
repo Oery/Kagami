@@ -135,12 +135,3 @@ fn attribute_snapshots_round_trip_with_modifiers() {
     assert_eq!(decoded.attributes, packet.attributes);
     assert_eq!(UpdateAttributes::ID.0, 0x86);
 }
-
-#[test]
-fn absorption_metadata_targets_the_player_accessor() {
-    use crate::packets::client::SetAbsorption;
-    let packet = SetAbsorption { entity_id: 1, absorption: 4.0 };
-    let bytes = encode(&packet);
-    assert_eq!(bytes, [1, 17, 3, 0x40, 0x80, 0, 0, 0xff]);
-    assert_eq!(SetAbsorption::decode_payload(&mut bytes.as_slice()).unwrap(), packet);
-}

@@ -1,13 +1,12 @@
-//! Inventory publication and reusable player lifecycle packets for protocol 777.
+//! Screens, respawn and combat packets for protocol 777.
 use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
-use crate::error::DecodeError;
 use crate::packets::{PacketWriter, Payload};
-use crate::types::{ItemStack, Nbt, VarInt};
+use crate::types::{Nbt, VarInt};
 
 // Protocol 777; verified against the 26.3 client screen codecs and MenuType registry.
 #[packet(Play, 0x3C, Client)]
@@ -38,109 +37,6 @@ pub struct BlockEvent {
 pub struct SetHeldItemResponse {
     #[format = "varint"]
     pub slot: i32,
-}
-
-#[derive(Debug)]
-pub struct SetContainerContent<'p> {
-    pub window_id: i32,
-    pub state_id: i32,
-    pub slots: &'p [ItemStack],
-    pub carried: &'p ItemStack,
-}
-
-impl<'p> Payload<'p> for SetContainerContent<'p> {
-    const ID: VarInt = VarInt(0x12);
-    const STATE: State = State::Play;
-    fn payload_len(&self) -> EncodeResult<usize> {
-        Ok(VarInt(self.window_id).body_len()
-            + VarInt(self.state_id).body_len()
-            + VarInt(self.slots.len() as i32).body_len()
-            + self.slots.iter().map(ItemStack::body_len).sum::<usize>()
-            + self.carried.body_len())
-    }
-    fn decode_payload(_input: &mut &'p [u8]) -> DecodeResult<Self> {
-        Err(DecodeError::EnumOutOfRange)
-    }
-    async fn write_payload<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        VarInt(self.window_id).write(w).await?;
-        VarInt(self.state_id).write(w).await?;
-        VarInt(self.slots.len() as i32).write(w).await?;
-        for item in self.slots {
-            item.write(w).await?;
-        }
-        self.carried.write(w).await
-    }
-}
-
-#[derive(Debug)]
-pub struct SetContainerSlot<'p> {
-    pub window_id: i32,
-    pub state_id: i32,
-    pub slot: i16,
-    pub stack: &'p ItemStack,
-}
-
-impl<'p> Payload<'p> for SetContainerSlot<'p> {
-    const ID: VarInt = VarInt(0x14);
-    const STATE: State = State::Play;
-    fn payload_len(&self) -> EncodeResult<usize> {
-        Ok(VarInt(self.window_id).body_len() + VarInt(self.state_id).body_len() + 2 + self.stack.body_len())
-    }
-    fn decode_payload(_input: &mut &'p [u8]) -> DecodeResult<Self> {
-        Err(DecodeError::EnumOutOfRange)
-    }
-    async fn write_payload<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        VarInt(self.window_id).write(w).await?;
-        VarInt(self.state_id).write(w).await?;
-        self.slot.write(w).await?;
-        self.stack.write(w).await
-    }
-}
-
-#[derive(Debug)]
-pub struct SetCursorItem<'p> {
-    pub stack: &'p ItemStack,
-}
-
-impl<'p> Payload<'p> for SetCursorItem<'p> {
-    const ID: VarInt = VarInt(0x62);
-    const STATE: State = State::Play;
-    fn payload_len(&self) -> EncodeResult<usize> {
-        Ok(self.stack.body_len())
-    }
-    fn decode_payload(_input: &mut &'p [u8]) -> DecodeResult<Self> {
-        Err(DecodeError::EnumOutOfRange)
-    }
-    async fn write_payload<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        self.stack.write(w).await
-    }
-}
-
-/// Main hand, offhand, feet, legs, chest, head. One immutable equipment image
-/// serves initial visibility and coalesced subsequent updates.
-#[derive(Debug)]
-pub struct SetEquipment<'p> {
-    pub entity_id: i32,
-    pub slots: &'p [ItemStack; 6],
-}
-
-impl<'p> Payload<'p> for SetEquipment<'p> {
-    const ID: VarInt = VarInt(0x68);
-    const STATE: State = State::Play;
-    fn payload_len(&self) -> EncodeResult<usize> {
-        Ok(VarInt(self.entity_id).body_len() + 6 + self.slots.iter().map(ItemStack::body_len).sum::<usize>())
-    }
-    fn decode_payload(_input: &mut &'p [u8]) -> DecodeResult<Self> {
-        Err(DecodeError::EnumOutOfRange)
-    }
-    async fn write_payload<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        VarInt(self.entity_id).write(w).await?;
-        for (slot, item) in self.slots.iter().enumerate() {
-            (slot as u8 | if slot < 5 { 0x80 } else { 0 }).write(w).await?;
-            item.write(w).await?;
-        }
-        Ok(())
-    }
 }
 
 #[derive(Debug)]

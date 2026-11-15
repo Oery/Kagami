@@ -1,7 +1,6 @@
 use futures_lite::AsyncWrite;
 
 use crate::State;
-use crate::data::motd::Status;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::packets::PacketWriter;
@@ -32,11 +31,11 @@ pub use blocks::*;
 mod scoreboard;
 pub use scoreboard::*;
 
-// TODO: how to handle borrowing here
+/// The raw JSON is kept so unknown fields survive; see
+/// [`Status`](crate::data::motd::Status) for building one.
 #[packet(Status, 0x00, Client)]
 pub struct StatusPacket<'p> {
-    #[format = "json"]
-    pub json: Status<'p>,
+    pub json: &'p str,
 }
 
 #[packet(Status, 0x01, Client)]

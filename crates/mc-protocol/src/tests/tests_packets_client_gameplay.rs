@@ -11,15 +11,9 @@ fn damage_event_entity_ids_remain_varints_after_documentation_attributes() {
 }
 
 #[test]
-fn inventory_equipment_and_respawn_lengths_match_frames() {
+fn respawn_lengths_match_frames() {
     futures_lite::future::block_on(async {
-        let empty = ItemStack::default();
-        let slots = std::array::from_fn(|_| empty.clone());
-        let packet = SetEquipment { entity_id: 1000, slots: &slots };
         let mut bytes = Vec::new();
-        packet.write_packet(&mut bytes).await.unwrap();
-        assert_eq!(bytes.len(), packet.payload_len().unwrap() + 2);
-        assert_eq!(&bytes[4..], &[0x80, 0, 0x81, 0, 0x82, 0, 0x83, 0, 0x84, 0, 5, 0]);
         let respawn = Respawn {
             dimension_type: 0,
             dimension_name: "minecraft:overworld",
@@ -33,7 +27,6 @@ fn inventory_equipment_and_respawn_lengths_match_frames() {
             sea_level: 63,
             data_kept: 0,
         };
-        bytes.clear();
         respawn.write_packet(&mut bytes).await.unwrap();
         let mut input = bytes.as_slice();
         let length = VarInt::read(&mut input).unwrap().0 as usize;

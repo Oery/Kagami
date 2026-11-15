@@ -86,7 +86,7 @@ fn command_tree_and_suggestions_use_brigadier_wire_fields() {
 }
 
 #[test]
-fn feedback_and_game_modes_encode_network_nbt_and_roster_action() {
+fn feedback_encodes_network_nbt() {
     assert_eq!(
         encode(&SystemChatMessage { content: Nbt::Str("ok"), overlay: false }),
         [7, 0x7c, 8, 0, 2, b'o', b'k', 0]
@@ -102,15 +102,6 @@ fn feedback_and_game_modes_encode_network_nbt_and_roster_action() {
         [13, 0x75, 0, 0, 0, 10, 0, 0, 0, 70, 0, 0, 0, 20]
     );
     assert_eq!(encode(&ClearTitles { reset: true }), [2, 0x0e, 1]);
-    for id in 0..4 {
-        let mode = GameMode::try_from(id).unwrap();
-        let bytes = encode(&PlayerInfoGameMode { players: &[(Uuid::nil(), mode)] });
-        assert_eq!(&bytes[..4], &[20, 0x47, 4, 1]);
-        assert_eq!(&bytes[4..20], &[0; 16]);
-        assert_eq!(bytes[20], id as u8);
-    }
-    assert!(GameMode::try_from(-1).is_err());
-    assert!(GameMode::try_from(4).is_err());
 }
 
 #[test]

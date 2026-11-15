@@ -1,12 +1,10 @@
-//! Gameplay commands are decoded into bounded owned values before simulation.
+//! Serverbound gameplay packets for protocol 777.
 use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
 
 use crate::State;
-use crate::data::items::{COMPONENT_COUNT, ITEMS};
-use crate::decode::{Result as DecodeResult, read_length};
+use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
-use crate::error::{DecodeError, EncodeError};
 use crate::packets::{PacketWriter, Payload};
 use crate::types::VarInt;
 
@@ -93,94 +91,91 @@ pub struct UseItem {
     pub pitch: f32,
 }
 
-/// Prediction hashes never enter gameplay ownership. Keeping only the slot mask
-/// lets the server overwrite every predicted change without implementing HashOps.
+/// An item stack as the client predicts it: components are sent as hashes.
 #[derive(Debug)]
+pub struct HashedItem {
+    pub item_id: i32,
+    pub count: i32,
+    pub added: Vec<ComponentHash>,
+    pub removed: Vec<VarInt>,
+}
+
+impl<'p> PacketWriter<'p> for HashedItem {
+    fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
+        let item_id = VarInt::read(input)?.0;
+        let count = VarInt::read(input)?.0;
+        let added = Vec::read(input)?;
+        let removed = Vec::read(input)?;
+        Ok(Self { item_id, count, added, removed })
+    }
+
+    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+        VarInt(self.item_id).write(w).await?;
+        VarInt(self.count).write(w).await?;
+        self.added.write(w).await?;
+        self.removed.write(w).await
+    }
+
+    fn body_len(&self) -> usize {
+        VarInt(self.item_id).body_len() + VarInt(self.count).body_len() + self.added.body_len() + self.removed.body_len()
+    }
+}
+
+#[derive(Debug)]
+pub struct ComponentHash {
+    pub component: i32,
+    /// CRC32C of the component value.
+    pub hash: i32,
+}
+
+impl<'p> PacketWriter<'p> for ComponentHash {
+    fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
+        Ok(Self { component: VarInt::read(input)?.0, hash: i32::read(input)? })
+    }
+
+    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+        VarInt(self.component).write(w).await?;
+        self.hash.write(w).await
+    }
+
+    fn body_len(&self) -> usize {
+        VarInt(self.component).body_len() + 4
+    }
+}
+
+#[derive(Debug)]
+pub struct ChangedSlot {
+    pub slot: i16,
+    pub item: Option<HashedItem>,
+}
+
+impl<'p> PacketWriter<'p> for ChangedSlot {
+    fn read(input: &mut &'p [u8]) -> DecodeResult<Self> {
+        Ok(Self { slot: i16::read(input)?, item: Option::read(input)? })
+    }
+
+    async fn write<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
+        self.slot.write(w).await?;
+        self.item.write(w).await
+    }
+
+    fn body_len(&self) -> usize {
+        2 + self.item.body_len()
+    }
+}
+
+#[packet(Play, 0x12, Server)]
 pub struct ClickContainer {
+    #[format = "varint"]
     pub window_id: i32,
+    #[format = "varint"]
     pub state_id: i32,
     pub slot: i16,
     pub button: u8,
+    #[format = "varint"]
     pub mode: i32,
-    pub predicted_slots: u128,
-}
-
-fn component_id(input: &mut &[u8]) -> DecodeResult<usize> {
-    let id = usize::try_from(VarInt::read(input)?.0).map_err(|_| DecodeError::EnumOutOfRange)?;
-    if id >= COMPONENT_COUNT {
-        return Err(DecodeError::EnumOutOfRange);
-    }
-    Ok(id)
-}
-
-fn skip_hashed_stack(input: &mut &[u8]) -> DecodeResult<()> {
-    if !bool::read(input)? {
-        return Ok(());
-    }
-    let id = usize::try_from(VarInt::read(input)?.0).map_err(|_| DecodeError::EnumOutOfRange)?;
-    if id == 0 || id >= ITEMS.len() {
-        return Err(DecodeError::EnumOutOfRange);
-    }
-    let count = VarInt::read(input)?.0;
-    if !(1..=99).contains(&count) {
-        return Err(DecodeError::InvalidLength);
-    }
-    let added = read_length(input, COMPONENT_COUNT)?;
-    let mut seen = 0u128;
-    for _ in 0..added {
-        let id = component_id(input)?;
-        if seen & (1 << id) != 0 {
-            return Err(DecodeError::InvalidLength);
-        }
-        seen |= 1 << id;
-        i32::read(input)?;
-    }
-    let removed = read_length(input, COMPONENT_COUNT)?;
-    for _ in 0..removed {
-        let id = component_id(input)?;
-        if seen & (1 << id) != 0 {
-            return Err(DecodeError::InvalidLength);
-        }
-        seen |= 1 << id;
-    }
-    Ok(())
-}
-
-impl<'p> Payload<'p> for ClickContainer {
-    const ID: VarInt = VarInt(0x12);
-    const STATE: State = State::Play;
-
-    fn payload_len(&self) -> EncodeResult<usize> {
-        Err(EncodeError::InvalidLength)
-    }
-
-    fn decode_payload(input: &mut &'p [u8]) -> DecodeResult<Self> {
-        let window_id = VarInt::read(input)?.0;
-        let state_id = VarInt::read(input)?.0;
-        let slot = i16::read(input)?;
-        let button = u8::read(input)?;
-        let mode = VarInt::read(input)?.0;
-        let changed = read_length(input, 128)?;
-        let mut predicted_slots = 0u128;
-        for _ in 0..changed {
-            let slot = i16::read(input)?;
-            if !(0..90).contains(&slot) {
-                return Err(DecodeError::EnumOutOfRange);
-            }
-            let bit = 1u128 << slot;
-            if predicted_slots & bit != 0 {
-                return Err(DecodeError::InvalidLength);
-            }
-            predicted_slots |= bit;
-            skip_hashed_stack(input)?;
-        }
-        skip_hashed_stack(input)?;
-        Ok(Self { window_id, state_id, slot, button, mode, predicted_slots })
-    }
-
-    async fn write_payload<W: AsyncWrite + Unpin>(&self, _w: &mut W) -> EncodeResult {
-        Err(EncodeError::InvalidLength)
-    }
+    pub changed_slots: Vec<ChangedSlot>,
+    pub carried: Option<HashedItem>,
 }
 
 #[cfg(test)]

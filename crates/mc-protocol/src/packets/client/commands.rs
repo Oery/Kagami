@@ -1,14 +1,13 @@
 //! Command trees with literals, words, numeric arguments and world coordinates.
 use futures_lite::AsyncWrite;
 use mc_protocol_macros::{Payload, packet};
-use uuid::Uuid;
 
 use crate::State;
 use crate::decode::Result as DecodeResult;
 use crate::encode::Result as EncodeResult;
 use crate::error::DecodeError;
 use crate::packets::{PacketWriter, Payload};
-use crate::types::{GameMode, Nbt, VarInt};
+use crate::types::{Nbt, VarInt};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CommandNumberKind {
@@ -217,35 +216,6 @@ pub struct SetTitlesAnimation {
     pub fade_in: i32,
     pub stay: i32,
     pub fade_out: i32,
-}
-
-/// Only the Update Game Mode action; profiles remain immutable and shared.
-#[derive(Debug)]
-pub struct PlayerInfoGameMode<'p> {
-    pub players: &'p [(Uuid, GameMode)],
-}
-
-impl<'p> Payload<'p> for PlayerInfoGameMode<'_> {
-    const ID: VarInt = VarInt(0x47);
-    const STATE: State = State::Play;
-
-    fn payload_len(&self) -> EncodeResult<usize> {
-        Ok(1 + VarInt(self.players.len() as i32).body_len() + self.players.len() * 17)
-    }
-
-    fn decode_payload(_input: &mut &'p [u8]) -> DecodeResult<Self> {
-        Err(DecodeError::EnumOutOfRange)
-    }
-
-    async fn write_payload<W: AsyncWrite + Unpin>(&self, w: &mut W) -> EncodeResult {
-        0x04u8.write(w).await?;
-        VarInt(self.players.len() as i32).write(w).await?;
-        for (uuid, mode) in self.players {
-            uuid.write(w).await?;
-            VarInt(*mode as i32).write(w).await?;
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]

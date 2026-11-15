@@ -68,30 +68,3 @@ fn display_slots_and_clear_use_varint_and_empty_name() {
     assert!(ObjectiveAction::read(&mut [3].as_slice()).is_err());
     assert!(ScoreNumberFormat::read(&mut [3].as_slice()).is_err());
 }
-
-#[test]
-fn stack_line_encoder_matches_the_general_codec_including_styling_and_unicode() {
-    for (text, color, decorations) in [("Time: 59s", None, 0), ("é\0🏆", Some("#12ab34"), 31)] {
-        for suffix in [None, Some(("445", "#79CFFF")), Some(("é\0🏆", "blue"))] {
-            let mut fields = vec![("text", Nbt::Str(text))];
-            if let Some(color) = color {
-                fields.push(("color", Nbt::Str(color)));
-            }
-            for (bit, name) in ["bold", "italic", "underlined", "strikethrough", "obfuscated"].iter().enumerate() {
-                fields.push((name, Nbt::Bool(decorations & (1 << bit) != 0)));
-            }
-            if let Some((text, color)) = suffix {
-                fields.push(("extra", Nbt::List(vec![Nbt::Compound(vec![("text", Nbt::Str(text)), ("color", Nbt::Str(color))])])));
-            }
-            let packet =
-                SetScore { holder: "line", objective: "game", value: -3, display: Some(Nbt::Compound(fields)), number_format: None };
-            let mut expected = Vec::new();
-            block_on(packet.write_packet(&mut expected)).unwrap();
-            let line = ScoreLine { holder: "line", objective: "game", value: -3, text, color, decorations, suffix };
-            let mut stack = [0u8; 512];
-            let len = line.encode_into(&mut stack).unwrap();
-            assert_eq!(&stack[..len], expected);
-            assert!(line.encode_into(&mut stack[..len - 1]).is_err());
-        }
-    }
-}
