@@ -30,6 +30,33 @@
 //! # Ok::<(), std::io::Error>(())
 //! ```
 //!
+//! Commands are better declared as types: Kagami parses them, answers
+//! mistakes with their usage, and adds them to the client's command tree so
+//! they complete like the server's own. See [`command`].
+//!
+//! ```no_run
+//! use kagami::Kagami;
+//! use kagami::command::{Command, PlayerName};
+//! use kagami::protocol::packets::server::ChatCommand;
+//!
+//! /// `/greet <player> [times]`
+//! #[derive(Command)]
+//! struct Greet<'c> {
+//!     player: PlayerName<'c>,
+//!     times: Option<u32>,
+//! }
+//!
+//! Kagami::new(())
+//!     .on_command::<Greet>(|greet, cx| {
+//!         for _ in 0..greet.times.unwrap_or(1) {
+//!             let message = format!("msg {} hello!", greet.player.as_str());
+//!             cx.server.send(&ChatCommand { command: message.into() });
+//!         }
+//!     })
+//!     .run("127.0.0.1:25566", "127.0.0.1:25565")?;
+//! # Ok::<(), std::io::Error>(())
+//! ```
+//!
 //! A plugin made of several handlers is a function over the builder,
 //! applied with [`Kagami::with`]:
 //!

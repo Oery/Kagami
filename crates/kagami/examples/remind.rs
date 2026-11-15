@@ -1,7 +1,7 @@
 //! Reminders in chat: `/remind <seconds> <text>` shows `text` once the time
-//! is up, and `/remind clear` cancels the pending ones. Each reminder is a
-//! task that sleeps; the server never sees the commands, and reminders end
-//! with the session.
+//! is up, and `/remind clear` cancels the pending ones. The command is a
+//! derived type, which the client completes; the server never sees it. Each
+//! reminder is a task that sleeps, and reminders end with the session.
 //!
 //! cargo run --release -p kagami --example remind -- 127.0.0.1:25566 play.example.net
 //!
@@ -11,10 +11,10 @@
 use std::io;
 use std::time::Duration;
 
+use kagami::command::{Command, GreedyText};
 use kagami::protocol::packets::client::SystemChatMessage;
-use kagami::protocol::packets::server::ChatCommand;
 use kagami::protocol::types::text::{Style, Text};
-use kagami::{Account, Action, Client, Handlers, Kagami, TaskHandle};
+use kagami::{Account, Client, Context, Handlers, Kagami, TaskHandle};
 
 #[derive(Default)]
 struct State {
@@ -39,56 +39,53 @@ fn main() -> io::Result<()> {
     proxy.run(&listen, &server)
 }
 
-fn reminders<H: Handlers<State>>(proxy: Kagami<State, H>) -> Kagami<State, impl Handlers<State>> {
-    proxy.on_packet::<ChatCommand>(|command, cx| {
-        let (name, arguments) = command.command.split_once(' ').unwrap_or((&command.command, ""));
-        if name != "remind" {
-            return Action::Forward;
-        }
+/// `/remind clear` or `/remind <seconds> <text>`.
+#[derive(Command)]
+enum Remind<'c> {
+    Clear,
+    #[command(default)]
+    Later {
+        seconds: u32,
+        text: GreedyText<'c>,
+    },
+}
 
+fn reminders<H: Handlers<State>>(proxy: Kagami<State, H>) -> Kagami<State, impl Handlers<State>> {
+    proxy.on_command::<Remind>(|remind, cx| {
         // Finished and stopped reminders are no longer pending.
         cx.state.pending.retain(TaskHandle::is_running);
 
-        if arguments == "clear" {
-            let cleared = cx.state.pending.len();
-            for reminder in cx.state.pending.drain(..) {
-                reminder.stop();
-            }
-
-            tell(cx.client, Text::new().plain(format!("Cleared {cleared} reminders")));
-            return Action::Drop;
+        match remind {
+            Remind::Clear => clear(cx),
+            Remind::Later { seconds, text } => remind_later(cx, Duration::from_secs(seconds.into()), text.0.to_owned()),
         }
-
-        let Some((delay, text)) = parse(arguments) else {
-            tell(cx.client, Text::new().push("Usage: /remind <seconds> <text> or /remind clear", Style::color("red")));
-            return Action::Drop;
-        };
-
-        let session = cx.session.clone();
-        let reminder = cx.spawn(async move {
-            kagami::sleep(delay).await;
-
-            let number = session.with(|state| {
-                state.shown += 1;
-                state.shown
-            });
-            let message = Text::new().push(format!("Reminder #{number}: "), Style::color("gold")).plain(text);
-            tell(&session.client, message);
-        });
-        cx.state.pending.push(reminder);
-
-        tell(cx.client, Text::new().plain(format!("Reminding you in {} s", delay.as_secs())));
-
-        Action::Drop
     })
 }
 
-/// Splits `<seconds> <text>`.
-fn parse(arguments: &str) -> Option<(Duration, String)> {
-    let (seconds, text) = arguments.split_once(' ')?;
-    let seconds = seconds.parse().ok()?;
+fn clear(cx: &mut Context<'_, State>) {
+    let cleared = cx.state.pending.len();
+    for reminder in cx.state.pending.drain(..) {
+        reminder.stop();
+    }
 
-    Some((Duration::from_secs(seconds), text.to_owned()))
+    tell(cx.client, Text::new().plain(format!("Cleared {cleared} reminders")));
+}
+
+fn remind_later(cx: &mut Context<'_, State>, delay: Duration, text: String) {
+    let session = cx.session.clone();
+    let reminder = cx.spawn(async move {
+        kagami::sleep(delay).await;
+
+        let number = session.with(|state| {
+            state.shown += 1;
+            state.shown
+        });
+        let message = Text::new().push(format!("Reminder #{number}: "), Style::color("gold")).plain(text);
+        tell(&session.client, message);
+    });
+    cx.state.pending.push(reminder);
+
+    tell(cx.client, Text::new().plain(format!("Reminding you in {} s", delay.as_secs())));
 }
 
 fn tell(client: &Client, text: Text) {
