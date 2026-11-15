@@ -131,5 +131,5 @@ pub struct SignedChatCommand<'p> {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_chat.rs"]
+#[path = "../../../tests/tests_packets_chat.rs"]
 mod tests;

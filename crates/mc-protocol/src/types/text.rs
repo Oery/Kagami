@@ -240,5 +240,5 @@ impl Title {
 }
 
 #[cfg(test)]
-#[path = "../tests/tests_types_text.rs"]
+#[path = "../../tests/tests_types_text.rs"]
 mod tests;

@@ -85,5 +85,5 @@ pub struct SetPlayerTeam<'p> {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_team.rs"]
+#[path = "../../../tests/tests_packets_team.rs"]
 mod tests;

@@ -161,5 +161,5 @@ pub struct ResetScore<'p> {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_scoreboard.rs"]
+#[path = "../../../tests/tests_packets_scoreboard.rs"]
 mod tests;

@@ -106,5 +106,5 @@ pub struct BossBar<'p> {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_boss_bar.rs"]
+#[path = "../../../tests/tests_packets_boss_bar.rs"]
 mod tests;

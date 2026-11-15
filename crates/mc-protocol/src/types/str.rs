@@ -110,5 +110,5 @@ impl<'p, T: PacketWriter<'p>> PacketWriter<'p> for Option<T> {
 }
 
 #[cfg(test)]
-#[path = "../tests/tests_types_str.rs"]
+#[path = "../../tests/tests_types_str.rs"]
 mod tests;

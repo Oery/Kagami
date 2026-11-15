@@ -148,5 +148,5 @@ pub struct PlayerInfoRemove {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_client_entity.rs"]
+#[path = "../../../tests/tests_packets_client_entity.rs"]
 mod tests;

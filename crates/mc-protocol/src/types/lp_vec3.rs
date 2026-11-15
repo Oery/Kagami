@@ -66,5 +66,5 @@ impl PacketWriter<'_> for LpVec3 {
 }
 
 #[cfg(test)]
-#[path = "../tests/tests_types_lp_vec3.rs"]
+#[path = "../../tests/tests_types_lp_vec3.rs"]
 mod tests;

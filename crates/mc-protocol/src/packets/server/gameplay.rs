@@ -177,5 +177,5 @@ pub struct ClickContainer {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_server_gameplay.rs"]
+#[path = "../../../tests/tests_packets_server_gameplay.rs"]
 mod tests;

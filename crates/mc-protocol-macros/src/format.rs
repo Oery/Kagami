@@ -27,5 +27,5 @@ impl Format {
 }
 
 #[cfg(test)]
-#[path = "tests/tests_format.rs"]
+#[path = "../tests/tests_format.rs"]
 mod tests;

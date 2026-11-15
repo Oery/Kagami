@@ -27,5 +27,5 @@ pub struct WorldEvent {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_client_blocks.rs"]
+#[path = "../../../tests/tests_packets_client_blocks.rs"]
 mod tests;

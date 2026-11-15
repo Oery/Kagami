@@ -219,5 +219,5 @@ pub struct SetTitlesAnimation {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_commands.rs"]
+#[path = "../../../tests/tests_packets_commands.rs"]
 mod tests;

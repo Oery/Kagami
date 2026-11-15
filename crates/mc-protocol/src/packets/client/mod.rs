@@ -246,7 +246,7 @@ pub struct TabList<'p> {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_tab_list.rs"]
+#[path = "../../../tests/tests_packets_tab_list.rs"]
 mod tab_list_tests;
 
 #[packet(Play, 0x33, Clientbound)]

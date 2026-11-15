@@ -182,5 +182,5 @@ pub fn packet_enum(attr: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[cfg(test)]
-#[path = "tests/tests_packet.rs"]
+#[path = "../tests/tests_packet.rs"]
 mod tests;

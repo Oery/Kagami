@@ -121,5 +121,5 @@ pub struct DamageEvent {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_client_gameplay.rs"]
+#[path = "../../../tests/tests_packets_client_gameplay.rs"]
 mod tests;

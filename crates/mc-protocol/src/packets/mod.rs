@@ -101,5 +101,5 @@ impl RawPacket<'_> {
 }
 
 #[cfg(test)]
-#[path = "../tests/tests_packets.rs"]
+#[path = "../../tests/tests_packets.rs"]
 mod tests;

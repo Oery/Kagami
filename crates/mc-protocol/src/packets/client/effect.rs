@@ -294,5 +294,5 @@ pub struct UpdateAttributes<'p> {
 }
 
 #[cfg(test)]
-#[path = "../../tests/tests_packets_client_effect.rs"]
+#[path = "../../../tests/tests_packets_client_effect.rs"]
 mod tests;
