@@ -88,6 +88,11 @@
 //! });
 //! ```
 
+// The command derives name `::kagami`, which inside this crate is itself.
+extern crate self as kagami;
+
+pub mod command;
+
 use std::io;
 use std::marker::PhantomData;
 use std::net::SocketAddr;

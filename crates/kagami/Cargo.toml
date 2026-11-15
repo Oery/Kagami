@@ -8,5 +8,6 @@ autotests = false
 
 [dependencies]
 glommio = { package = "glommio-ng", version = "0.12" }
+kagami-macros = { path = "../kagami-macros" }
 kagami-proxy = { path = "../kagami-proxy" }
 mc_protocol = { path = "../mc-protocol" }

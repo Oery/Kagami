@@ -803,8 +803,18 @@ name = "kagami"
 version = "0.1.0"
 dependencies = [
  "glommio-ng",
+ "kagami-macros",
  "kagami-proxy",
  "mc_protocol",
+]
+
+[[package]]
+name = "kagami-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
 ]
 
 [[package]]
