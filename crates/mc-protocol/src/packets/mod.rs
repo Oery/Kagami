@@ -7,6 +7,7 @@ use crate::decode::Result as DecodeResult;
 use crate::direction::Direction;
 use crate::encode::Result as EncodeResult;
 use crate::error::EncodeError;
+use crate::owned::IntoOwned;
 use crate::state::State;
 use crate::types::VarInt;
 
@@ -74,7 +75,7 @@ pub trait PacketKind: 'static {
     const ID: u8;
 
     /// This packet, borrowing a buffer that lives for `'p`.
-    type Packet<'p>: Payload<'p>;
+    type Packet<'p>: Payload<'p> + IntoOwned<Owned = Self::Packet<'static>>;
 
     /// Returns the packet if `packet` holds this kind; always `None` for a
     /// clientbound kind.
