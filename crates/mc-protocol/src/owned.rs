@@ -37,6 +37,22 @@ impl<T: IntoOwned> IntoOwned for Vec<T> {
     }
 }
 
+impl<T: IntoOwned, const N: usize> IntoOwned for [T; N] {
+    type Owned = [T::Owned; N];
+
+    fn into_owned(self) -> Self::Owned {
+        self.map(T::into_owned)
+    }
+}
+
+impl<T: IntoOwned> IntoOwned for Box<T> {
+    type Owned = Box<T::Owned>;
+
+    fn into_owned(self) -> Self::Owned {
+        Box::new((*self).into_owned())
+    }
+}
+
 impl<T: IntoOwned> IntoOwned for Option<T> {
     type Owned = Option<T::Owned>;
 

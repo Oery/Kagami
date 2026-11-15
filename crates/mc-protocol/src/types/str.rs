@@ -110,6 +110,46 @@ impl<'p, T: PacketWriter<'p>> PacketWriter<'p> for Option<T> {
     }
 }
 
+/// A fixed number of values, without a length prefix.
+impl<'p, T: PacketWriter<'p>, const N: usize> PacketWriter<'p> for [T; N] {
+    fn read(buf: &mut &'p [u8]) -> Result<Self, DecodeError> {
+        let mut elements = Vec::with_capacity(N);
+
+        for _ in 0..N {
+            elements.push(T::read(buf)?);
+        }
+
+        elements.try_into().map_err(|_| DecodeError::InvalidLength)
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        for element in self {
+            element.encode(out)?;
+        }
+
+        Ok(())
+    }
+
+    fn body_len(&self) -> usize {
+        self.iter().map(T::body_len).sum()
+    }
+}
+
+/// A boxed value has the codec of the value; it breaks recursive types.
+impl<'p, T: PacketWriter<'p>> PacketWriter<'p> for Box<T> {
+    fn read(buf: &mut &'p [u8]) -> Result<Self, DecodeError> {
+        Ok(Box::new(T::read(buf)?))
+    }
+
+    fn encode(&self, out: &mut Vec<u8>) -> crate::encode::Result {
+        self.as_ref().encode(out)
+    }
+
+    fn body_len(&self) -> usize {
+        self.as_ref().body_len()
+    }
+}
+
 #[cfg(test)]
 #[path = "../../tests/tests_types_str.rs"]
 mod tests;

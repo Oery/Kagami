@@ -2,7 +2,7 @@ use crate::decode::take;
 use crate::error::DecodeError;
 use crate::packets::PacketWriter;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VarInt(pub i32);
 
 impl<'p> PacketWriter<'p> for VarInt {
