@@ -19,13 +19,16 @@ use flate2::write::ZlibEncoder;
 use futures_lite::{AsyncReadExt, AsyncWriteExt};
 use glommio::LocalExecutorBuilder;
 use glommio::net::{TcpListener, TcpStream};
-use kagami_proxy::{Account, Config, Upstream};
-use mc_protocol::packets::client::{EncryptionRequest, FinishConfiguration, LoginSuccess, SetCompression};
-use mc_protocol::packets::server::{AcknowledgeFinish, EncryptionResponse, LoginAcknowledge, LoginStart, ServerListPing};
+use kagami_proxy::{Account, Action, Config, Context, Handlers, Interest, Upstream};
+use mc_protocol::packets::PacketKind;
+use mc_protocol::packets::client::{EncryptionRequest, FinishConfiguration, LoginSuccess, PlayKeepAlive, SetCompression};
+use mc_protocol::packets::server::{
+    AcknowledgeFinish, EncryptionResponse, LoginAcknowledge, LoginStart, PlayKeepAliveResponse, ServerListPing,
+};
 use mc_protocol::packets::{Clientbound, Serverbound};
 use mc_protocol::state::HandshakeIntent;
 use mc_protocol::types::GameProfile;
-use mc_protocol::{PROTOCOL_VERSION, PacketWriter, Payload, State, VarInt};
+use mc_protocol::{Direction, PROTOCOL_VERSION, PacketWriter, Payload, State, VarInt};
 use rsa::pkcs8::{DecodePublicKey, EncodePublicKey};
 use rsa::{Pkcs1v15Encrypt, PrivateKey, PublicKey};
 use uuid::Uuid;
@@ -53,13 +56,44 @@ struct Wire {
     name: &'static str,
     compression: Option<i32>,
     encryption: bool,
+    /// The proxy runs handlers on the keep-alives the echo uses.
+    handled: bool,
 }
 
-const WIRES: [Wire; 3] = [
-    Wire { name: "plain", compression: None, encryption: false },
-    Wire { name: "compressed", compression: Some(COMPRESSION_THRESHOLD), encryption: false },
-    Wire { name: "online", compression: Some(COMPRESSION_THRESHOLD), encryption: true },
+const WIRES: [Wire; 4] = [
+    Wire { name: "plain", compression: None, encryption: false, handled: false },
+    Wire { name: "handled", compression: None, encryption: false, handled: true },
+    Wire { name: "compressed", compression: Some(COMPRESSION_THRESHOLD), encryption: false, handled: false },
+    Wire { name: "online", compression: Some(COMPRESSION_THRESHOLD), encryption: true, handled: false },
 ];
+
+/// Handlers on both keep-alives, so each echo round trip is decoded and
+/// handled once per direction. Bulk packets have no handler.
+struct KeepAlives;
+
+impl Handlers<i64> for KeepAlives {
+    const INTEREST: Interest = Interest::NONE.with(Direction::Serverbound, State::Play, <PlayKeepAliveResponse as PacketKind>::ID).with(
+        Direction::Clientbound,
+        State::Play,
+        <PlayKeepAlive as PacketKind>::ID,
+    );
+
+    fn serverbound(&mut self, packet: &mut Serverbound<'_>, cx: &mut Context<'_, i64>) -> Action {
+        if let Some(response) = PlayKeepAliveResponse::from_serverbound(packet) {
+            *cx.state += response.id;
+        }
+
+        Action::Forward
+    }
+
+    fn clientbound(&mut self, packet: &mut Clientbound<'_>, cx: &mut Context<'_, i64>) -> Action {
+        if let Some(keep_alive) = PlayKeepAlive::from_clientbound(packet) {
+            *cx.state += keep_alive.id;
+        }
+
+        Action::Forward
+    }
+}
 
 #[derive(Clone, Copy)]
 enum Scenario {
@@ -506,7 +540,12 @@ fn start_proxy(server: SocketAddr, wire: Wire) -> SocketAddr {
     let account = wire.encryption.then(|| Account { access_token: String::new(), uuid: Uuid::nil(), name: "bench".to_owned() });
     let upstream = Upstream { host: server.ip().to_string(), port: server.port() };
 
-    thread::spawn(move || kagami_proxy::run(Config { listen, upstream, account }, (), ()).unwrap());
+    let config = Config { listen, upstream, account };
+
+    thread::spawn(move || match wire.handled {
+        true => kagami_proxy::run(config, 0, KeepAlives).unwrap(),
+        false => kagami_proxy::run(config, (), ()).unwrap(),
+    });
 
     listen
 }
