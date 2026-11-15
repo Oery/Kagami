@@ -15,6 +15,8 @@ mod entity;
 pub use entity::*;
 mod gameplay;
 pub use gameplay::*;
+mod inventory;
+pub use inventory::*;
 mod player;
 pub use player::*;
 mod player_info;

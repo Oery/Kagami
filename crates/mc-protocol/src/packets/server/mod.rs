@@ -229,3 +229,5 @@ mod chat;
 pub use chat::*;
 mod common;
 pub use common::*;
+mod inventory;
+pub use inventory::*;
