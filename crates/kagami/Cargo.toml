@@ -7,8 +7,6 @@ license.workspace = true
 autotests = false
 
 [dependencies]
+glommio = { package = "glommio-ng", version = "0.12" }
 kagami-proxy = { path = "../kagami-proxy" }
 mc_protocol = { path = "../mc-protocol" }
-
-[dev-dependencies]
-glommio = { package = "glommio-ng", version = "0.12" }

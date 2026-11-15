@@ -47,6 +47,46 @@
 //!
 //! let proxy = Kagami::new(()).with(low_health_warning);
 //! ```
+//!
+//! Handlers never wait. Anything that takes time runs in a task spawned in
+//! the client's [`Session`]: it sends packets through the same handles,
+//! reads the state with [`Session::with`], and is cancelled when the client
+//! disconnects.
+//!
+//! ```
+//! use std::time::Duration;
+//!
+//! use kagami::protocol::packets::server::ChatCommand;
+//! use kagami::{Action, Kagami};
+//!
+//! #[derive(Default)]
+//! struct State {
+//!     spam: Option<kagami::TaskHandle>,
+//! }
+//!
+//! let proxy = Kagami::new(State::default()).on_packet::<ChatCommand>(|command, cx| {
+//!     if command.command != "spam" {
+//!         return Action::Forward;
+//!     }
+//!
+//!     // The second `/spam` stops the first.
+//!     if let Some(spam) = cx.state.spam.take() {
+//!         spam.stop();
+//!         return Action::Drop;
+//!     }
+//!
+//!     let server = cx.server.clone();
+//!     let spam = cx.spawn(async move {
+//!         loop {
+//!             server.send(&ChatCommand { command: "say hello".into() });
+//!             kagami::sleep(Duration::from_secs(2)).await;
+//!         }
+//!     });
+//!     cx.state.spam = Some(spam);
+//!
+//!     Action::Drop
+//! });
+//! ```
 
 use std::io;
 use std::marker::PhantomData;
@@ -55,7 +95,9 @@ use std::net::SocketAddr;
 use mc_protocol::packets::{Clientbound, PacketKind, Serverbound};
 use mc_protocol::{Direction, State};
 
-pub use kagami_proxy::{Account, Action, Client, Context, Handlers, Interest, Server};
+pub use glommio::future::timeout;
+pub use glommio::timer::sleep;
+pub use kagami_proxy::{Account, Action, Client, Context, Handlers, Interest, Server, Session, Subscription, TaskHandle};
 pub use mc_protocol as protocol;
 
 /// A proxy and its handlers, built by chaining.
