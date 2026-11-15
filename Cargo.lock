@@ -364,6 +364,7 @@ dependencies = [
  "futures-lite",
  "glommio-ng",
  "mc_protocol",
+ "uuid",
 ]
 
 [[package]]
