@@ -28,6 +28,8 @@ pub enum Serverbound<'p> {
     ConfigResourcePackResponse(ConfigResourcePackResponse),
     ConfigKnownPacks(ConfigKnownPacks<'p>),
     AcceptCodeOfConduct(AcceptCodeOfConduct),
+    ConfigPong(ConfigPong),
+    ConfigCustomClickAction(ConfigCustomClickAction<'p>),
 
     // Play
     ConfirmTeleportation(ConfirmTeleportation),
@@ -60,4 +62,10 @@ pub enum Serverbound<'p> {
     TeleportToEntity(TeleportToEntity),
     UseItemOn(UseItemOn),
     UseItem(UseItem),
+    PlayPong(PlayPong),
+    PlayPingRequest(PlayPingRequest),
+    PlayCookieResponse(PlayCookieResponse<'p>),
+    ClientPluginMessage(ClientPluginMessage<'p>),
+    PlayResourcePackResponse(PlayResourcePackResponse),
+    PlayCustomClickAction(PlayCustomClickAction<'p>),
 }

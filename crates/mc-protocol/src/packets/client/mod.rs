@@ -17,6 +17,8 @@ mod player;
 pub use player::*;
 mod commands;
 pub use commands::*;
+mod common;
+pub use common::*;
 mod team;
 pub use team::*;
 mod blocks;
@@ -107,12 +109,6 @@ pub struct ResetChat;
 pub struct CodeOfConduct<'p> {
     pub coc: Cow<'p, str>,
 }
-
-// NOTE: unused by vanilla server
-// #[packet(Config, 0x05, Clientbound)]
-// pub struct ConfigPing {
-//     pub id: i32,
-// }
 
 #[packet(Config, 0x08, Clientbound)]
 pub struct RemoveResourcePack {
