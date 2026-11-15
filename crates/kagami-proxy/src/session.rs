@@ -1,12 +1,12 @@
 //! One client's session as handlers and tasks see it: its sockets, its
 //! tasks and subscriptions, and the state every session shares.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::future::Future;
 use std::rc::Rc;
 
-use mc_protocol::State;
 use mc_protocol::packets::PacketKind;
+use mc_protocol::{Direction, State};
 
 use crate::handlers::{Context, Interest};
 use crate::outlet::{Client, Server};
@@ -18,12 +18,25 @@ pub struct Shared<S> {
     /// The state given to the proxy.
     pub state: RefCell<S>,
     /// Packet kinds whose handlers are turned off.
-    pub disabled: RefCell<Interest>,
+    disabled: RefCell<Interest>,
+    /// Counts changes to `disabled`, so pumps notice them without
+    /// comparing whole sets.
+    disabled_changes: Cell<u64>,
 }
 
 impl<S> Shared<S> {
     pub fn new(state: S) -> Self {
-        Self { state: RefCell::new(state), disabled: RefCell::new(Interest::NONE) }
+        Self { state: RefCell::new(state), disabled: RefCell::new(Interest::NONE), disabled_changes: Cell::new(0) }
+    }
+
+    fn set_disabled(&self, direction: Direction, state: State, id: u8, disabled: bool) {
+        let mut kinds = self.disabled.borrow_mut();
+
+        *kinds = match disabled {
+            true => kinds.with(direction, state, id),
+            false => kinds.without(direction, state, id),
+        };
+        self.disabled_changes.set(self.disabled_changes.get() + 1);
     }
 }
 
@@ -89,9 +102,7 @@ impl<S> Session<S> {
 
     /// Turns the handlers of `K` packets back on.
     pub fn enable<K: PacketKind>(&self) {
-        let mut disabled = self.shared.disabled.borrow_mut();
-
-        *disabled = disabled.without(K::DIRECTION, K::STATE, K::ID);
+        self.shared.set_disabled(K::DIRECTION, K::STATE, K::ID, false);
     }
 
     /// Turns off every handler of `K` packets, in every session, until
@@ -99,9 +110,7 @@ impl<S> Session<S> {
     /// being decoded. A packet being handled still reaches the rest of its
     /// handlers.
     pub fn disable<K: PacketKind>(&self) {
-        let mut disabled = self.shared.disabled.borrow_mut();
-
-        *disabled = disabled.with(K::DIRECTION, K::STATE, K::ID);
+        self.shared.set_disabled(K::DIRECTION, K::STATE, K::ID, true);
     }
 
     /// Whether the handlers of `K` packets are on.
@@ -112,6 +121,17 @@ impl<S> Session<S> {
     /// The packet kinds whose handlers are turned off.
     pub(crate) fn disabled(&self) -> Interest {
         *self.shared.disabled.borrow()
+    }
+
+    pub(crate) fn is_disabled(&self, direction: Direction, state: State, id: u8) -> bool {
+        self.shared.disabled.borrow().contains(direction, state, id)
+    }
+
+    /// Grows whenever handlers are turned off or on, or a subscription
+    /// starts or ends: both counts only grow, so their sum changes with
+    /// either.
+    pub(crate) fn interest_changes(&self) -> u64 {
+        self.shared.disabled_changes.get() + self.subscriptions.changes()
     }
 
     pub(crate) fn subscriptions(&self) -> &Subscriptions {

@@ -28,8 +28,10 @@ pub struct Pump<S, H> {
     inflater: Option<Inflater>,
     /// The packets wanted by handlers that are on, or by subscriptions. Only
     /// handlers and tasks change it, so it is refreshed before each scan and
-    /// after handlers run.
+    /// after handlers run, when the session counted a change.
     interest: Interest,
+    /// The session's count of interest changes `interest` was computed at.
+    interest_changes: u64,
     /// Shared by every session.
     handlers: Rc<RefCell<H>>,
     session: Session<S>,
@@ -63,7 +65,9 @@ impl<S, H: Handlers<S>> Pump<S, H> {
             direction,
             state: State::Config,
             inflater: compressed.then(Inflater::new),
+            // Right until anything is turned off or subscribed to.
             interest: H::INTEREST,
+            interest_changes: 0,
             handlers,
             session,
             inflated: Vec::new(),
@@ -172,15 +176,22 @@ impl<S, H: Handlers<S>> Pump<S, H> {
     }
 
     fn refresh_interest(&mut self) {
-        let handled = H::INTEREST.difference(self.session.disabled());
+        let changes = self.session.interest_changes();
+        if changes == self.interest_changes {
+            return;
+        }
 
+        let handled = H::INTEREST.difference(self.session.disabled());
         self.interest = handled.union(self.session.subscriptions().interest());
+        self.interest_changes = changes;
     }
 
     fn wanted(&self, id: u8) -> Wanted {
-        let handled = H::INTEREST.difference(self.session.disabled());
-        let handlers = handled.contains(self.direction, self.state, id);
-        let subscriptions = self.session.subscriptions().interest().contains(self.direction, self.state, id);
+        let (direction, state) = (self.direction, self.state);
+
+        let registered = H::INTEREST.contains(direction, state, id);
+        let handlers = registered && !self.session.is_disabled(direction, state, id);
+        let subscriptions = self.session.subscriptions().contains(direction, state, id);
 
         Wanted { handlers, subscriptions }
     }

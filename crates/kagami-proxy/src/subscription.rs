@@ -22,6 +22,9 @@ pub struct Subscriptions {
     queues: RefCell<Vec<Rc<Queue>>>,
     /// Set once the session ended: queues are closed and new ones start closed.
     closed: Cell<bool>,
+    /// Counts changes to `interest`, so pumps notice them without comparing
+    /// whole sets.
+    changes: Cell<u64>,
 }
 
 impl Subscriptions {
@@ -40,6 +43,7 @@ impl Subscriptions {
 
             let mut interest = self.interest.borrow_mut();
             *interest = interest.with(K::DIRECTION, K::STATE, K::ID);
+            self.changed();
         }
 
         Subscription { queue, subscriptions: Rc::downgrade(self), kind: PhantomData }
@@ -48,6 +52,18 @@ impl Subscriptions {
     /// The packets at least one subscription wants.
     pub fn interest(&self) -> Interest {
         *self.interest.borrow()
+    }
+
+    pub fn contains(&self, direction: Direction, state: State, id: u8) -> bool {
+        self.interest.borrow().contains(direction, state, id)
+    }
+
+    pub fn changes(&self) -> u64 {
+        self.changes.get()
+    }
+
+    fn changed(&self) {
+        self.changes.set(self.changes.get() + 1);
     }
 
     /// Copies `packet` (its id, then its payload) to every queue that wants
@@ -67,6 +83,7 @@ impl Subscriptions {
     pub fn close(&self) {
         self.closed.set(true);
         *self.interest.borrow_mut() = Interest::NONE;
+        self.changed();
 
         let queues = std::mem::take(&mut *self.queues.borrow_mut());
         for queue in queues {
@@ -87,6 +104,7 @@ impl Subscriptions {
 
         let mut interest = self.interest.borrow_mut();
         *interest = interest.without(queue.direction, queue.state, queue.id);
+        self.changed();
     }
 }
 
