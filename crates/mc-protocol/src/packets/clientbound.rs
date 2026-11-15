@@ -121,4 +121,10 @@ pub enum Clientbound<'p> {
     PlayServerLinks(PlayServerLinks<'p>),
     PlayShowDialog(PlayShowDialog<'p>),
     PlayClearDialog(PlayClearDialog),
+    PlayerChat(PlayerChat<'p>),
+    DisguisedChat(DisguisedChat<'p>),
+    DeleteMessage(DeleteMessage<'p>),
+    SetActionBarText(SetActionBarText<'p>),
+    ChatSuggestions(ChatSuggestions<'p>),
+    PlayerInfoUpdate(PlayerInfoUpdate<'p>),
 }

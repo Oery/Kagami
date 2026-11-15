@@ -13,6 +13,9 @@ pub enum EncodeError {
 
     #[error("can't encode json")]
     InvalidJSON(#[from] serde_json::Error),
+
+    #[error("a field the packet's flags require is missing")]
+    MissingField,
 }
 
 #[derive(Error, Debug)]

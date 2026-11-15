@@ -7,6 +7,8 @@ use crate::types::{BlockEntity, GameProfile, Heightmap, KnownPack, LightData, Nb
 
 mod boss_bar;
 pub use boss_bar::*;
+mod chat;
+pub use chat::*;
 mod effect;
 pub use effect::*;
 mod entity;
@@ -15,6 +17,8 @@ mod gameplay;
 pub use gameplay::*;
 mod player;
 pub use player::*;
+mod player_info;
+pub use player_info::*;
 mod commands;
 pub use commands::*;
 mod common;
